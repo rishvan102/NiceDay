@@ -355,6 +355,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
   <script>pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js" crossorigin="anonymous"></script>
+
 
   <!-- Load pdf-lib robustly -->
   <script>
@@ -685,24 +687,17 @@
         });
 
         function attachDragHandlers(){
-          let dragEl = null;
-          grid.querySelectorAll('[draggable=true]').forEach(el=>{
-            el.addEventListener('dragstart', (e)=>{ dragEl = el; el.classList.add('drag-ghost'); e.dataTransfer.effectAllowed='move'; });
-            el.addEventListener('dragend', ()=>{ dragEl && dragEl.classList.remove('drag-ghost'); dragEl=null; });
-            el.addEventListener('dragover', (e)=>{ e.preventDefault(); });
-            el.addEventListener('drop', (e)=>{
-              e.preventDefault();
-              const target = el;
-              if(dragEl && dragEl!==target){
-                const children = Array.from(grid.children);
-                const from = children.indexOf(dragEl);
-                const to = children.indexOf(target);
-                if(from < to) grid.insertBefore(dragEl, target.nextSibling); else grid.insertBefore(dragEl, target);
-                reorderState.order = Array.from(grid.children).map(n=> parseInt(n.dataset.page,10));
-              }
-            });
-          });
-        }
+  new Sortable(grid, {
+    animation: 150,               // smooth reordering
+    ghostClass: 'drag-ghost',     // reuse your ghost style
+    onSort: () => {
+      // update current order after every drag
+      reorderState.order = Array.from(grid.children)
+        .map(n => parseInt(n.dataset.page, 10));
+    }
+  });
+}
+
 
         reorderReset.onclick = ()=>{
           if(!reorderState.pageCount) return;
