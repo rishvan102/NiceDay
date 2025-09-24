@@ -448,641 +448,772 @@
   </footer>
 
   <!-- Libs (pinned; defer) -->
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
-  <script>
-    document.addEventListener('DOMContentLoaded', ()=> {
-      if (window.pdfjsLib) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', ()=> {
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    }
+  });
+</script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js" crossorigin="anonymous"></script>
+
+<!-- Boot coordinator: ensure app starts only when DOM + pdf-lib are ready -->
+<script>
+  (function(){
+    window.__ndBoot = { domReady:false, pdfLibReady:false };
+    window.__ndTryStart = function(){
+      if (window.__ndBoot.domReady && window.__ndBoot.pdfLibReady && typeof window.initPDFHandlers === 'function') {
+        // Run once
+        if (!window.__ndBoot.started){
+          window.__ndBoot.started = true;
+          window.initPDFHandlers();
+        }
       }
+    };
+  })();
+</script>
+
+<!-- pdf-lib robust loader -->
+<script>
+  (function loadPdfLibAndStart(){
+    function start(){
+      if (!window.PDFLib){ alert('pdf-lib failed to load.'); return; }
+      window.__ndBoot.pdfLibReady = true;
+      window.__ndTryStart();
+    }
+    const s=document.createElement('script');
+    s.defer = true;
+    s.src='https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js';
+    s.onload=start;
+    s.onerror=()=>{ 
+      const s2=document.createElement('script'); 
+      s2.defer=true; 
+      s2.src='https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js'; 
+      s2.onload=start; 
+      s2.onerror=()=>alert('Could not load pdf-lib.'); 
+      document.head.appendChild(s2); 
+    };
+    document.head.appendChild(s);
+  })();
+</script>
+
+<!-- App -->
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    window.__ndBoot.domReady = true;
+
+    // Footer year (optional element)
+    const yrEl = document.getElementById('yr'); if (yrEl) yrEl.textContent = new Date().getFullYear();
+
+    // Search filter
+    const search = document.getElementById('toolSearch');
+    function applyFilter(){
+      const activeTab = document.querySelector('.tabpanel:not(.hidden)'); if(!activeTab) return;
+      const cards = activeTab.querySelectorAll('.tool-card');
+      const q = (search?.value || '').toLowerCase();
+      cards.forEach(card=>{
+        const tags=(card.dataset.tags||'').toLowerCase();
+        const text=(card.innerText||'').toLowerCase();
+        const ok = !q || text.includes(q) || tags.includes(q);
+        card.classList.toggle('hidden-by-filter', !ok);
+      });
+    }
+    search?.addEventListener('input', applyFilter);
+
+    // Tabs
+    const tabs = document.querySelectorAll('.tab');
+    const panels = document.querySelectorAll('.tabpanel');
+    function showTab(name){
+      tabs.forEach(t=>{
+        const isActive = t.dataset.tab===name;
+        t.classList.toggle('active', isActive);
+        t.setAttribute('aria-pressed', String(isActive));
+      });
+      panels.forEach(p=>p.classList.toggle('hidden', p.dataset.tabpanel!==name));
+      applyFilter();
+    }
+    tabs.forEach(t=>t.addEventListener('click', ()=>showTab(t.dataset.tab)));
+    showTab('docs');
+
+    // Install/PWA (prevents auto banner, shows your button, then calls prompt())
+    const installBtn = document.getElementById('installBtn');
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e)=>{
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn?.classList.remove('hidden');
     });
-  </script>
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js" crossorigin="anonymous"></script>
+    installBtn?.addEventListener('click', async ()=>{
+      if(!deferredPrompt) return;
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      installBtn.classList.add('hidden');
+    });
+    window.addEventListener('appinstalled', ()=> installBtn?.classList.add('hidden'));
 
-  <!-- pdf-lib robust loader -->
-  <script>
-    (function loadPdfLibAndStart(){
-      function start(){ if(!window.PDFLib){ alert('pdf-lib failed to load.'); return; } initNiceDayApp(); }
-      const s=document.createElement('script'); s.defer = true;
-      s.src='https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js';
-      s.onload=start;
-      s.onerror=()=>{ const s2=document.createElement('script'); s2.defer=true; s2.src='https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js'; s2.onload=start; s2.onerror=()=>alert('Could not load pdf-lib.'); document.head.appendChild(s2); };
-      document.head.appendChild(s);
-    })();
-  </script>
+    // Service Worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./service-worker.js').catch(console.error);
+    }
 
-  <!-- App -->
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      // Footer year
-      document.getElementById('yr').textContent = new Date().getFullYear();
+    // ===== App logic (will be called by boot once pdf-lib is ready) =====
+    window.initPDFHandlers = function(){
+      const { PDFDocument, StandardFonts, rgb, degrees } = window.PDFLib;
 
-      const search = document.getElementById('toolSearch');
-      function applyFilter(){
-        const activeTab = document.querySelector('.tabpanel:not(.hidden)'); if(!activeTab) return;
-        const cards = activeTab.querySelectorAll('.tool-card');
-        const q = (search?.value || '').toLowerCase();
-        cards.forEach(card=>{
-          const tags=(card.dataset.tags||'').toLowerCase();
-          const text=(card.innerText||'').toLowerCase();
-          const ok = !q || text.includes(q) || tags.includes(q);
-          card.classList.toggle('hidden-by-filter', !ok);
-        });
-      }
-      search?.addEventListener('input', applyFilter);
-
-      // Tabs
-      const tabs = document.querySelectorAll('.tab');
-      const panels = document.querySelectorAll('.tabpanel');
-      function showTab(name){
-        tabs.forEach(t=>{
-          const isActive = t.dataset.tab===name;
-          t.classList.toggle('active', isActive);
-          t.setAttribute('aria-pressed', String(isActive));
-        });
-        panels.forEach(p=>p.classList.toggle('hidden', p.dataset.tabpanel!==name));
-        applyFilter();
-      }
-      tabs.forEach(t=>t.addEventListener('click', ()=>showTab(t.dataset.tab)));
-      showTab('docs');
-
-      // Install/PWA
-      const installBtn = document.getElementById('installBtn');
-      let deferredPrompt = null;
-      window.addEventListener('beforeinstallprompt', (e)=>{ e.preventDefault(); deferredPrompt = e; installBtn.classList.remove('hidden'); });
-      installBtn.addEventListener('click', async ()=>{ if(!deferredPrompt) return; deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; installBtn.classList.add('hidden'); });
-      window.addEventListener('appinstalled', ()=> installBtn.classList.add('hidden'));
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./service-worker.js').catch(console.error);
+      // Bytes + save helpers
+      async function fileToBytes(file){ const buf = await file.arrayBuffer(); return new Uint8Array(buf); }
+      function copyBytes(u8){ return u8.slice(0); }
+      function saveBlob(blob, filename){
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+        setTimeout(()=> URL.revokeObjectURL(url), 1000);
       }
 
-      // ===== App logic (after pdf-lib) =====
-      window.initNiceDayApp = function initPDFHandlers(){
-        const { PDFDocument, StandardFonts, rgb, degrees } = window.PDFLib;
+      // Vibes
+      const QUOTES = [
+        "You're doing amazing — keep going! 💪","Small steps create big changes 🌱","Your effort matters more than perfection ✨",
+        "Today is a fresh start — make it count 🌞","You are stronger than you think 💡","Believe in progress, not perfection 🌟",
+        "One positive action can change your whole day 💖"
+      ];
+      const ACTION_TITLES = { note:"Note saved!", text:"Document created!", merge:"PDFs merged!", split:"Pages split!",
+        images:"Images converted!", rotate:"Pages rotated!", reorder:"Pages reordered!", del:"Pages deleted!",
+        extract:"Pages extracted!", numbers:"Numbers added!", watermark:"Watermark added!",
+        pdf2img:"Images exported!", meta:"Clean copy ready!", compress:"PDF compressed!", redact:"Redactions applied!" };
+      const mq = document.getElementById('moodQuote');
+      if (mq) mq.textContent = `Today’s note: ${QUOTES[Math.floor(Math.random()*QUOTES.length)]}`;
 
-        // Bytes + save helpers
-        async function fileToBytes(file){ const buf = await file.arrayBuffer(); return new Uint8Array(buf); }
-        function copyBytes(u8){ return u8.slice(0); }
-        function saveBlob(blob, filename){
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
-          setTimeout(()=> URL.revokeObjectURL(url), 1000);
+      // Motivator modal
+      const overlay = document.getElementById('ndOverlay');
+      const modal   = document.getElementById('ndModal');
+      const titleEl = document.getElementById('ndTitle');
+      const msgEl   = document.getElementById('ndMsg');
+      const closeEl = document.getElementById('ndClose');
+      function showMotivator(kind){ 
+        if (!overlay || !modal) return;
+        if (titleEl) titleEl.textContent = ACTION_TITLES[kind]||"Nice work!";
+        if (msgEl) msgEl.textContent = QUOTES[Math.floor(Math.random()*QUOTES.length)];
+        overlay.classList.add('show'); 
+        modal.style.visibility='visible'; 
+        modal.classList.add('show'); 
+        closeEl?.focus(); 
+      }
+      function hideMotivator(){ 
+        if (!overlay || !modal) return;
+        overlay.classList.remove('show'); 
+        modal.classList.remove('show'); 
+        setTimeout(()=>{ modal.style.visibility='hidden'; },180); 
+      }
+      overlay?.addEventListener('click', hideMotivator); 
+      closeEl?.addEventListener('click', hideMotivator);
+      window.addEventListener('keydown', e=>{ if(e.key==='Escape') hideMotivator(); });
+
+      async function downloadPdf(pdfDoc, filename, kind){
+        const bytes = await pdfDoc.save();
+        saveBlob(new Blob([bytes], { type: 'application/pdf' }), filename);
+        showMotivator(kind);
+      }
+
+      function wrapText(page, text, font, size, x, y, width, leading, color){
+        const words = String(text||'').split(/\s+/);
+        let line = '', ty = y;
+        for(const w of words){
+          const test = line ? line + ' ' + w : w;
+          if(font.widthOfTextAtSize(test, size) > width){
+            if(line) page.drawText(line, { x, y: ty, size, font, color });
+            ty -= leading; line = w;
+          } else line = test;
         }
+        if(line) page.drawText(line, { x, y: ty, size, font, color });
+        return ty;
+      }
 
-        // Vibes
-        const QUOTES = [
-          "You're doing amazing — keep going! 💪","Small steps create big changes 🌱","Your effort matters more than perfection ✨",
-          "Today is a fresh start — make it count 🌞","You are stronger than you think 💡","Believe in progress, not perfection 🌟",
-          "One positive action can change your whole day 💖"
-        ];
-        const ACTION_TITLES = { note:"Note saved!", text:"Document created!", merge:"PDFs merged!", split:"Pages split!",
-          images:"Images converted!", rotate:"Pages rotated!", reorder:"Pages reordered!", del:"Pages deleted!",
-          extract:"Pages extracted!", numbers:"Numbers added!", watermark:"Watermark added!",
-          pdf2img:"Images exported!", meta:"Clean copy ready!", compress:"PDF compressed!", redact:"Redactions applied!" };
-        document.getElementById('moodQuote').textContent = `Today’s note: ${QUOTES[Math.floor(Math.random()*QUOTES.length)]}`;
+      /* === Wire up all tool buttons/flows (same logic you had) === */
 
-        // Motivator modal
-        const overlay = document.getElementById('ndOverlay');
-        const modal   = document.getElementById('ndModal');
-        const titleEl = document.getElementById('ndTitle');
-        const msgEl   = document.getElementById('ndMsg');
-        const closeEl = document.getElementById('ndClose');
-        function showMotivator(kind){ titleEl.textContent=ACTION_TITLES[kind]||"Nice work!"; msgEl.textContent=QUOTES[Math.floor(Math.random()*QUOTES.length)];
-          overlay.classList.add('show'); modal.style.visibility='visible'; modal.classList.add('show'); closeEl.focus(); }
-        function hideMotivator(){ overlay.classList.remove('show'); modal.classList.remove('show'); setTimeout(()=>{ modal.style.visibility='hidden'; },180); }
-        overlay.addEventListener('click', hideMotivator); closeEl.addEventListener('click', hideMotivator);
-        window.addEventListener('keydown', e=>{ if(e.key==='Escape') hideMotivator(); });
-
-        async function downloadPdf(pdfDoc, filename, kind){
-          const bytes = await pdfDoc.save();
-          saveBlob(new Blob([bytes], { type: 'application/pdf' }), filename);
-          showMotivator(kind);
-        }
-
-        function wrapText(page, text, font, size, x, y, width, leading, color){
-          const words = String(text||'').split(/\s+/);
-          let line = '', ty = y;
-          for(const w of words){
-            const test = line ? line + ' ' + w : w;
-            if(font.widthOfTextAtSize(test, size) > width){
-              if(line) page.drawText(line, { x, y: ty, size, font, color });
-              ty -= leading; line = w;
-            } else line = test;
+      // DOCS: Note
+      const noteBtn = document.getElementById('noteBtn');
+      const noteInput = document.getElementById('noteInput');
+      const noteTitle = document.getElementById('noteTitle');
+      const noteStatus = document.getElementById('noteStatus');
+      noteBtn?.addEventListener('click', async () => {
+        if(!noteInput) return;
+        const status = noteStatus;
+        const text = noteInput.value.trim();
+        if(!text){ status && (status.textContent = "Type something first."); return; }
+        try{
+          const pdf = await PDFDocument.create();
+          const helv = await pdf.embedFont(StandardFonts.Helvetica);
+          let page = pdf.addPage([595.28, 841.89]);
+          const margin = 50, width = page.getSize().width - margin*2;
+          let y = page.getSize().height - margin - 20;
+          const title = (noteTitle?.value || 'My Note');
+          page.drawText(title, { x: margin, y, size: 18, font: helv, color: rgb(0.1,0.1,0.1) });
+          y -= 28;
+          const paragraphs = text.split(/\n{2,}/);
+          for(const p of paragraphs){
+            const body = p.split(/\n/).join(' ');
+            let ty = wrapText(page, body, helv, 12, margin, y, width, 16, rgb(0.2,0.2,0.2));
+            y = ty - 18;
+            if(y < 60){ page = pdf.addPage([595.28, 841.89]); y = page.getSize().height - margin; }
           }
-          if(line) page.drawText(line, { x, y: ty, size, font, color });
-          return ty;
-        }
+          await downloadPdf(pdf, `NiceDay_Note_${Date.now()}.pdf`, 'note');
+          status && (status.textContent = "Done.");
+        }catch(e){ console.error(e); status && (status.textContent = "Error creating PDF."); }
+      });
 
-        // === DOCS: Note
-        noteBtn.onclick = async () => {
-          const status = noteStatus;
-          const text = noteInput.value.trim();
-          if(!text){ status.textContent = "Type something first."; return; }
-          try{
-            const pdf = await PDFDocument.create();
-            const helv = await pdf.embedFont(StandardFonts.Helvetica);
+      // DOCS: TXT/MD -> PDF
+      const txtFilesBtn = document.getElementById('txtFilesBtn');
+      const txtFilesInput = document.getElementById('txtFilesInput');
+      const txtFilesStatus = document.getElementById('txtFilesStatus');
+      txtFilesBtn?.addEventListener('click', async () => {
+        const status = txtFilesStatus;
+        if(!txtFilesInput?.files?.length){ status && (status.textContent = "Choose .txt or .md files."); return; }
+        try{
+          const pdf = await PDFDocument.create();
+          const helv = await pdf.embedFont(StandardFonts.Helvetica);
+          for(const f of txtFilesInput.files){
+            const text = await f.text();
             let page = pdf.addPage([595.28, 841.89]);
-            const margin = 50, width = page.getSize().width - margin*2;
+            const margin=50, width=page.getSize().width - margin*2;
             let y = page.getSize().height - margin - 20;
-            const title = (noteTitle.value || 'My Note');
-            page.drawText(title, { x: margin, y, size: 18, font: helv, color: rgb(0.1,0.1,0.1) });
-            y -= 28;
-            const paragraphs = text.split(/\n{2,}/);
-            for(const p of paragraphs){
-              const body = p.split(/\n/).join(' ');
+            page.drawText(f.name, { x: margin, y, size: 16, font: helv, color: rgb(0.1,0.1,0.1) });
+            y -= 24;
+            const blocks = text.split(/\n{2,}/);
+            for(const b of blocks){
+              const body = b.replace(/^#.*$/gm,'').replace(/\*\*(.*?)\*\*/g,'$1');
               let ty = wrapText(page, body, helv, 12, margin, y, width, 16, rgb(0.2,0.2,0.2));
               y = ty - 18;
               if(y < 60){ page = pdf.addPage([595.28, 841.89]); y = page.getSize().height - margin; }
             }
-            await downloadPdf(pdf, `NiceDay_Note_${Date.now()}.pdf`, 'note');
-            status.textContent = "Done.";
-          }catch(e){ console.error(e); status.textContent = "Error creating PDF."; }
-        };
-
-        // === DOCS: TXT/MD -> PDF
-        txtFilesBtn.onclick = async () => {
-          const status = txtFilesStatus;
-          if(!txtFilesInput.files.length){ status.textContent = "Choose .txt or .md files."; return; }
-          try{
-            const pdf = await PDFDocument.create();
-            const helv = await pdf.embedFont(StandardFonts.Helvetica);
-            for(const f of txtFilesInput.files){
-              const text = await f.text();
-              let page = pdf.addPage([595.28, 841.89]);
-              const margin=50, width=page.getSize().width - margin*2;
-              let y = page.getSize().height - margin - 20;
-              page.drawText(f.name, { x: margin, y, size: 16, font: helv, color: rgb(0.1,0.1,0.1) });
-              y -= 24;
-              const blocks = text.split(/\n{2,}/);
-              for(const b of blocks){
-                const body = b.replace(/^#.*$/gm,'').replace(/\*\*(.*?)\*\*/g,'$1');
-                let ty = wrapText(page, body, helv, 12, margin, y, width, 16, rgb(0.2,0.2,0.2));
-                y = ty - 18;
-                if(y < 60){ page = pdf.addPage([595.28, 841.89]); y = page.getSize().height - margin; }
-              }
-            }
-            await downloadPdf(pdf, `NiceDay_Text_${Date.now()}.pdf`, 'text');
-            status.textContent = "Done.";
-          }catch(e){ console.error(e); status.textContent = "Error creating PDF."; }
-        };
-
-        // === Convert: Images -> PDF
-        imgBtn.onclick = async () => {
-          const status = imgStatus;
-          if(!imgInput.files.length){ status.textContent="Choose images."; return }
-          try{
-            const out = await PDFDocument.create();
-            for(const f of imgInput.files){
-              const bytes = await f.arrayBuffer();
-              const isPng = (f.type||'').toLowerCase().includes('png');
-              const img = isPng ? await out.embedPng(bytes) : await out.embedJpg(bytes);
-              const page = out.addPage([595.28,841.89]);
-              const maxW=595.28-60, maxH=841.89-60;
-              const r = Math.min(maxW/img.width, maxH/img.height);
-              const w=img.width*r, h=img.height*r;
-              page.drawImage(img,{ x:(595.28-w)/2, y:(841.89-h)/2, width:w, height:h });
-            }
-            await downloadPdf(out, `NiceDay_Images_${Date.now()}.pdf`, 'images');
-            status.textContent="Done.";
-          }catch(e){ console.error(e); status.textContent="Error creating PDF."; }
-        };
-
-        // === Convert: PDF -> Images (ZIP)
-        pdf2imgBtn.onclick = async ()=> {
-          const status = pdf2imgStatus;
-          const file = pdf2imgInput.files && pdf2imgInput.files[0];
-          if(!file){ status.textContent = 'Choose a PDF.'; return; }
-          status.textContent = 'Rendering pages…';
-          try{
-            const data = new Uint8Array(await file.arrayBuffer());
-            const pdf = await pdfjsLib.getDocument({ data }).promise;
-            const zip = new JSZip();
-            const format = pdf2imgFormat.value; // png or jpeg
-            const scale = parseFloat(pdf2imgScale.value||'1');
-
-            for(let n=1;n<=pdf.numPages;n++){
-              const page = await pdf.getPage(n);
-              const viewport = page.getViewport({ scale: 2 * scale });
-              const canvas = document.createElement('canvas');
-              const ctx = canvas.getContext('2d');
-              canvas.width = viewport.width; canvas.height = viewport.height;
-              await page.render({ canvasContext: ctx, viewport }).promise;
-
-              const mime = format==='jpeg' ? 'image/jpeg' : 'image/png';
-              const dataURL = canvas.toDataURL(mime, 0.92);
-              const base64 = dataURL.split(',')[1];
-              const fname = `page_${String(n).padStart(3,'0')}.${format==='jpeg'?'jpg':'png'}`;
-              zip.file(fname, base64, { base64: true });
-            }
-            const blob = await zip.generateAsync({ type:'blob' });
-            saveBlob(blob, `NiceDay_Pages_${Date.now()}.zip`);
-            status.textContent = 'Done.'; showMotivator('pdf2img');
-          }catch(e){ console.error(e); status.textContent = 'Error exporting images.'; }
-        };
-
-        // === Convert: Compress
-        cmpBtn.onclick = async ()=> {
-          const status = cmpStatus;
-          if(!cmpInput.files.length){ status.textContent='Choose a PDF.'; return; }
-          status.textContent = 'Compressing…';
-          try{
-            const scale = parseFloat(cmpScale.value||'1');
-            const quality = Math.min(0.95, Math.max(0.3, parseFloat(cmpQuality.value||'0.8')));
-            const fmt = cmpFormat.value; // 'jpeg' or 'png'
-            const data = new Uint8Array(await cmpInput.files[0].arrayBuffer());
-            const pdf = await pdfjsLib.getDocument({ data }).promise;
-
-            const out = await PDFDocument.create();
-            for(let n=1;n<=pdf.numPages;n++){
-              const page = await pdf.getPage(n);
-              const viewport = page.getViewport({ scale: 2*scale });
-              const canvas = document.createElement('canvas');
-              const ctx = canvas.getContext('2d',{ willReadFrequently:true });
-              canvas.width = viewport.width; canvas.height = viewport.height;
-              await page.render({ canvasContext: ctx, viewport }).promise;
-
-              let bytes, img;
-              if(fmt==='png'){
-                const b64 = canvas.toDataURL('image/png').split(',')[1];
-                bytes = Uint8Array.from(atob(b64), c=>c.charCodeAt(0));
-                img = await out.embedPng(bytes);
-              }else{
-                const b64 = canvas.toDataURL('image/jpeg', quality).split(',')[1];
-                bytes = Uint8Array.from(atob(b64), c=>c.charCodeAt(0));
-                img = await out.embedJpg(bytes);
-              }
-              const pw = img.width, ph = img.height;
-              const pageOut = out.addPage([pw, ph]);
-              pageOut.drawImage(img, { x:0, y:0, width: pw, height: ph });
-            }
-            await downloadPdf(out, `NiceDay_Compressed_${Date.now()}.pdf`, 'compress');
-            status.textContent = 'Done.';
-          }catch(e){ console.error(e); status.textContent='Error compressing.'; }
-        };
-
-        // === Helpers
-        function parseRanges(text){
-          const parts = String(text||'').split(',').map(s=>s.trim()).filter(Boolean), out=[];
-          for(const p of parts){
-            if(p.includes('-')){ let [a,b]=p.split('-').map(n=>parseInt(n,10)); if(!isNaN(a)&&!isNaN(b)) out.push([a,b]); }
-            else { let n=parseInt(p,10); if(!isNaN(n)) out.push([n,n]); }
           }
-          return out;
-        }
+          await downloadPdf(pdf, `NiceDay_Text_${Date.now()}.pdf`, 'text');
+          status && (status.textContent = "Done.");
+        }catch(e){ console.error(e); status && (status.textContent = "Error creating PDF."); }
+      });
 
-        // === Organize: Merge
-        mergeBtn.onclick = async () => {
-          const status = mergeStatus;
-          if(mergeInput.files.length < 2){ status.textContent = "Select at least 2 PDFs."; return }
-          status.textContent = "Merging…";
-          try{
-            const out = await PDFDocument.create();
-            for(const f of mergeInput.files){
-              const bytes = await f.arrayBuffer();
-              const src = await PDFDocument.load(bytes);
-              const pages = await out.copyPages(src, src.getPageIndices());
-              pages.forEach(p => out.addPage(p));
-            }
-            await downloadPdf(out, `NiceDay_Merged_${Date.now()}.pdf`, 'merge');
-            status.textContent = "Done.";
-          }catch(e){ console.error(e); status.textContent = "Error merging."; }
-        };
+      // Convert: Images -> PDF
+      const imgBtn = document.getElementById('imgBtn');
+      const imgInput = document.getElementById('imgInput');
+      const imgStatus = document.getElementById('imgStatus');
+      imgBtn?.addEventListener('click', async () => {
+        const status = imgStatus;
+        if(!imgInput?.files?.length){ status && (status.textContent="Choose images."); return; }
+        try{
+          const out = await PDFDocument.create();
+          for(const f of imgInput.files){
+            const bytes = await f.arrayBuffer();
+            const isPng = (f.type||'').toLowerCase().includes('png');
+            const img = isPng ? await out.embedPng(bytes) : await out.embedJpg(bytes);
+            const page = out.addPage([595.28,841.89]);
+            const maxW=595.28-60, maxH=841.89-60;
+            const r = Math.min(maxW/img.width, maxH/img.height);
+            const w=img.width*r, h=img.height*r;
+            page.drawImage(img,{ x:(595.28-w)/2, y:(841.89-h)/2, width:w, height:h });
+          }
+          await downloadPdf(out, `NiceDay_Images_${Date.now()}.pdf`, 'images');
+          status && (status.textContent="Done.");
+        }catch(e){ console.error(e); status && (status.textContent="Error creating PDF."); }
+      });
 
-        // === Organize: Split
-        splitBtn.onclick = async () => {
-          const status = splitStatus;
-          if(!splitInput.files.length){ status.textContent="Choose a PDF."; return }
-          const ranges = parseRanges(splitRanges.value);
-          if(!ranges.length){ status.textContent="Enter valid ranges."; return }
-          try{
-            const bytes = await splitInput.files[0].arrayBuffer();
-            const src = await PDFDocument.load(bytes);
-            const total = src.getPageCount();
-            for(const [a,b] of ranges){
-              const start=Math.max(1,a), end=Math.min(total,b);
-              const out = await PDFDocument.create();
-              const idxs = Array.from({length:end-start+1},(_,i)=>start-1+i);
-              const pages = await out.copyPages(src, idxs);
-              pages.forEach(p => out.addPage(p));
-              await downloadPdf(out, `NiceDay_Split_${start}-${end}_${Date.now()}.pdf`, 'split');
-            }
-            status.textContent="Done.";
-          }catch(e){ console.error(e); status.textContent="Error splitting."; }
-        };
+      // Convert: PDF -> Images (ZIP)
+      const pdf2imgBtn = document.getElementById('pdf2imgBtn');
+      const pdf2imgInput = document.getElementById('pdf2imgInput');
+      const pdf2imgFormat = document.getElementById('pdf2imgFormat');
+      const pdf2imgScale = document.getElementById('pdf2imgScale');
+      const pdf2imgStatus = document.getElementById('pdf2imgStatus');
+      pdf2imgBtn?.addEventListener('click', async ()=>{
+        const status = pdf2imgStatus;
+        const file = pdf2imgInput?.files && pdf2imgInput.files[0];
+        if(!file){ status && (status.textContent = 'Choose a PDF.'); return; }
+        status && (status.textContent = 'Rendering pages…');
+        try{
+          const data = new Uint8Array(await file.arrayBuffer());
+          const pdf = await pdfjsLib.getDocument({ data }).promise;
+          const zip = new JSZip();
+          const format = pdf2imgFormat?.value || 'png'; // png or jpeg
+          const scale = parseFloat(pdf2imgScale?.value||'1');
 
-        // === Organize: Reorder (DnD)
-        const reorderState = { order: [], originalBytes: null, pageCount: 0 };
-        const grid = document.getElementById('reorderGrid');
-        const statusR = document.getElementById('reorderDnDStatus');
-
-        reorderDnDInput.addEventListener('change', async ()=> {
-          grid.innerHTML = ''; statusR.textContent = '';
-          const file = reorderDnDInput.files[0]; if(!file){ return; }
-          reorderState.originalBytes = await fileToBytes(file);
-          const pdf = await pdfjsLib.getDocument({ data: copyBytes(reorderState.originalBytes) }).promise;
-          reorderState.pageCount = pdf.numPages;
-          reorderState.order = Array.from({length: pdf.numPages}, (_,i)=> i+1);
-          for(let n=1; n<=pdf.numPages; n++){
+          for(let n=1;n<=pdf.numPages;n++){
             const page = await pdf.getPage(n);
-            const viewport = page.getViewport({ scale: 0.2 });
+            const viewport = page.getViewport({ scale: 2 * scale });
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             canvas.width = viewport.width; canvas.height = viewport.height;
             await page.render({ canvasContext: ctx, viewport }).promise;
 
-            const item = document.createElement('div');
-            item.className = 'border rounded-lg p-1 text-center select-none bg-white dark:bg-black/20';
-            item.dataset.page = n;
-
-            const img = document.createElement('img');
-            img.src = canvas.toDataURL('image/png'); img.alt = `Page ${n} thumbnail`;
-            img.className = 'thumb w-full rounded';
-            const label = document.createElement('div');
-            label.className = 'text-xs mt-1 text-gray-600 dark:text-gray-400'; label.textContent = `Page ${n}`;
-
-            item.appendChild(img); item.appendChild(label); grid.appendChild(item);
+            const mime = format==='jpeg' ? 'image/jpeg' : 'image/png';
+            const dataURL = canvas.toDataURL(mime, 0.92);
+            const base64 = dataURL.split(',')[1];
+            const fname = `page_${String(n).padStart(3,'0')}.${format==='jpeg'?'jpg':'png'}`;
+            zip.file(fname, base64, { base64: true });
           }
-          // Sortable for drag
-          new Sortable(grid, {
-            animation: 150,
-            ghostClass: 'drag-ghost',
-            onSort: () => {
-              reorderState.order = Array.from(grid.children).map(n => parseInt(n.dataset.page, 10));
+          const blob = await zip.generateAsync({ type:'blob' });
+          saveBlob(blob, `NiceDay_Pages_${Date.now()}.zip`);
+          status && (status.textContent = 'Done.');
+          showMotivator('pdf2img');
+        }catch(e){ console.error(e); status && (status.textContent = 'Error exporting images.'); }
+      });
+
+      // Convert: Compress
+      const cmpBtn = document.getElementById('cmpBtn');
+      const cmpInput = document.getElementById('cmpInput');
+      const cmpScale = document.getElementById('cmpScale');
+      const cmpQuality = document.getElementById('cmpQuality');
+      const cmpFormat = document.getElementById('cmpFormat');
+      const cmpStatus = document.getElementById('cmpStatus');
+      cmpBtn?.addEventListener('click', async ()=>{
+        const status = cmpStatus;
+        if(!cmpInput?.files?.length){ status && (status.textContent='Choose a PDF.'); return; }
+        status && (status.textContent = 'Compressing…');
+        try{
+          const scale = parseFloat(cmpScale?.value||'1');
+          const quality = Math.min(0.95, Math.max(0.3, parseFloat(cmpQuality?.value||'0.8')));
+          const fmt = (cmpFormat?.value||'jpeg'); // 'jpeg' or 'png'
+          const data = new Uint8Array(await cmpInput.files[0].arrayBuffer());
+          const pdf = await pdfjsLib.getDocument({ data }).promise;
+
+          const out = await PDFDocument.create();
+          for(let n=1;n<=pdf.numPages;n++){
+            const page = await pdf.getPage(n);
+            const viewport = page.getViewport({ scale: 2*scale });
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d',{ willReadFrequently:true });
+            canvas.width = viewport.width; canvas.height = viewport.height;
+            await page.render({ canvasContext: ctx, viewport }).promise;
+
+            let bytes, img;
+            if(fmt==='png'){
+              const b64 = canvas.toDataURL('image/png').split(',')[1];
+              bytes = Uint8Array.from(atob(b64), c=>c.charCodeAt(0));
+              img = await out.embedPng(bytes);
+            }else{
+              const b64 = canvas.toDataURL('image/jpeg', quality).split(',')[1];
+              bytes = Uint8Array.from(atob(b64), c=>c.charCodeAt(0));
+              img = await out.embedJpg(bytes);
             }
-          });
-        });
+            const pw = img.width, ph = img.height;
+            const pageOut = out.addPage([pw, ph]);
+            pageOut.drawImage(img, { x:0, y:0, width: pw, height: ph });
+          }
+          await downloadPdf(out, `NiceDay_Compressed_${Date.now()}.pdf`, 'compress');
+          status && (status.textContent = 'Done.');
+        }catch(e){ console.error(e); status && (status.textContent='Error compressing.'); }
+      });
 
-        reorderReset.onclick = ()=> {
-          if(!reorderState.pageCount) return;
-          const items = Array.from(grid.children).sort((a,b)=> parseInt(a.dataset.page)-parseInt(b.dataset.page));
-          items.forEach(i=>grid.appendChild(i));
-          reorderState.order = Array.from({length: reorderState.pageCount}, (_,i)=> i+1);
-        };
+      // Helpers
+      function parseRanges(text){
+        const parts = String(text||'').split(',').map(s=>s.trim()).filter(Boolean), out=[];
+        for(const p of parts){
+          if(p.includes('-')){ let [a,b]=p.split('-').map(n=>parseInt(n,10)); if(!isNaN(a)&&!isNaN(b)) out.push([a,b]); }
+          else { let n=parseInt(p,10); if(!isNaN(n)) out.push([n,n]); }
+        }
+        return out;
+      }
 
-        reorderExport.onclick = async ()=> {
-          if(!reorderState.originalBytes){ statusR.textContent = 'Upload a PDF first.'; return; }
-          try{
-            const src = await PDFDocument.load(copyBytes(reorderState.originalBytes));
-            const out = await PDFDocument.create();
-            const total = src.getPageCount();
-            const order = reorderState.order.length ? reorderState.order : Array.from({length: total}, (_,i)=> i+1);
-            const zeroIdx = order.map(n=> Math.min(total, Math.max(1, n)) - 1);
-            const pages = await out.copyPages(src, zeroIdx);
-            pages.forEach(p=> out.addPage(p));
-            await downloadPdf(out, `NiceDay_Reordered_${Date.now()}.pdf`, 'reorder');
-            statusR.textContent = 'Done.';
-          }catch(err){ console.error(err); statusR.textContent = 'Error exporting.'; }
-        };
-
-        // === Edit: Delete
-        delBtn.onclick = async () => {
-          const status = delStatus;
-          if(!delInput.files.length){ status.textContent="Choose a PDF."; return }
-          try{
-            const bytes = await delInput.files[0].arrayBuffer();
+      // Organize: Merge
+      const mergeBtn = document.getElementById('mergeBtn');
+      const mergeInput = document.getElementById('mergeInput');
+      const mergeStatus = document.getElementById('mergeStatus');
+      mergeBtn?.addEventListener('click', async () => {
+        const status = mergeStatus;
+        if(!mergeInput?.files || mergeInput.files.length < 2){ status && (status.textContent = "Select at least 2 PDFs."); return }
+        status && (status.textContent = "Merging…");
+        try{
+          const out = await PDFDocument.create();
+          for(const f of mergeInput.files){
+            const bytes = await f.arrayBuffer();
             const src = await PDFDocument.load(bytes);
-            const total = src.getPageCount();
-            const delRanges = parseRanges(delList.value);
-            const toDel = new Set();
-            for(const [a,b] of delRanges){ const s=Math.max(1,a), e=Math.min(total,b); for(let i=s;i<=e;i++) toDel.add(i-1); }
-            const out = await PDFDocument.create();
-            const keepIdx = src.getPageIndices().filter(i=>!toDel.has(i));
-            const pages = await out.copyPages(src, keepIdx);
+            const pages = await out.copyPages(src, src.getPageIndices());
             pages.forEach(p => out.addPage(p));
-            await downloadPdf(out, `NiceDay_Deleted_${Date.now()}.pdf`, 'del');
-            status.textContent="Done.";
-          }catch(e){ console.error(e); status.textContent="Error deleting."; }
-        };
+          }
+          await downloadPdf(out, `NiceDay_Merged_${Date.now()}.pdf`, 'merge');
+          status && (status.textContent = "Done.");
+        }catch(e){ console.error(e); status && (status.textContent = "Error merging."); }
+      });
 
-        // === Edit: Extract
-        extBtn.onclick = async () => {
-          const status = extStatus;
-          if(!extInput.files.length){ status.textContent="Choose a PDF."; return }
-          try{
-            const bytes = await extInput.files[0].arrayBuffer();
-            const src = await PDFDocument.load(bytes);
-            const total = src.getPageCount();
-            const ranges = parseRanges(extList.value);
-            if(!ranges.length){ status.textContent="Enter valid ranges."; return }
+      // Organize: Split
+      const splitBtn = document.getElementById('splitBtn');
+      const splitInput = document.getElementById('splitInput');
+      const splitRanges = document.getElementById('splitRanges');
+      const splitStatus = document.getElementById('splitStatus');
+      splitBtn?.addEventListener('click', async () => {
+        const status = splitStatus;
+        if(!splitInput?.files?.length){ status && (status.textContent="Choose a PDF."); return }
+        const ranges = parseRanges(splitRanges?.value);
+        if(!ranges.length){ status && (status.textContent="Enter valid ranges."); return }
+        try{
+          const bytes = await splitInput.files[0].arrayBuffer();
+          const src = await PDFDocument.load(bytes);
+          const total = src.getPageCount();
+          for(const [a,b] of ranges){
+            const start=Math.max(1,a), end=Math.min(total,b);
             const out = await PDFDocument.create();
-            const idxs = [];
-            for(const [a,b] of ranges){ const s=Math.max(1,a), e=Math.min(total,b); for(let i=s;i<=e;i++) idxs.push(i-1); }
+            const idxs = Array.from({length:end-start+1},(_,i)=>start-1+i);
             const pages = await out.copyPages(src, idxs);
             pages.forEach(p => out.addPage(p));
-            await downloadPdf(out, `NiceDay_Extract_${Date.now()}.pdf`, 'extract');
-            status.textContent="Done.";
-          }catch(e){ console.error(e); status.textContent="Error extracting."; }
-        };
+            await downloadPdf(out, `NiceDay_Split_${start}-${end}_${Date.now()}.pdf`, 'split');
+          }
+          status && (status.textContent="Done.");
+        }catch(e){ console.error(e); status && (status.textContent="Error splitting."); }
+      });
 
-        // === Edit: Rotate
-        rotBtn.onclick = async () => {
-          const status = rotStatus;
-          if(!rotInput.files.length){ status.textContent="Choose a PDF."; return }
-          const angle = parseInt(rotAngle.value,10);
-          const ranges = parseRanges(rotRanges.value);
-          if(![90,180,270].includes(angle) || !ranges.length){ status.textContent = "Angle 90/180/270 + valid ranges."; return; }
-          try{
-            const bytes = await rotInput.files[0].arrayBuffer();
-            const src = await PDFDocument.load(bytes);
-            const out = await PDFDocument.create();
-            const total = src.getPageCount();
-            const targets = new Set();
-            for(const [a,b] of ranges){ const s=Math.max(1,a), e=Math.min(total,b); for(let i=s;i<=e;i++) targets.add(i-1); }
-            const pages = await out.copyPages(src, src.getPageIndices());
-            pages.forEach((p,idx)=>{ if(targets.has(idx)) p.setRotation(degrees(angle)); out.addPage(p); });
-            await downloadPdf(out, `NiceDay_Rotated_${Date.now()}.pdf`, 'rotate');
-            status.textContent="Done.";
-          }catch(e){ console.error(e); status.textContent="Error rotating."; }
-        };
+      // Organize: Reorder (DnD)
+      const reorderDnDInput = document.getElementById('reorderDnDInput');
+      const grid = document.getElementById('reorderGrid');
+      const reorderReset = document.getElementById('reorderReset');
+      const reorderExport = document.getElementById('reorderExport');
+      const reorderDnDStatus = document.getElementById('reorderDnDStatus');
 
-        // === Edit: Page numbers
-        numBtn.onclick = async () => {
-          const status = numStatus;
-          if(!numInput.files.length){ status.textContent="Choose a PDF."; return }
-          try{
-            const bytes = await numInput.files[0].arrayBuffer();
-            const src = await PDFDocument.load(bytes);
-            const out = await PDFDocument.create();
-            const helv = await out.embedFont(StandardFonts.Helvetica);
-            const pages = await out.copyPages(src, src.getPageIndices());
-            const margin = parseFloat(numMargin.value||'24');
-            const pos = numPos.value;
-            const color = rgb(0.2,0.2,0.2);
-            const size = 10;
-            pages.forEach((p,i)=>{
-              out.addPage(p);
-              const { width, height } = p.getSize();
-              const text = `${i+1} / ${pages.length}`;
-              const tw = helv.widthOfTextAtSize(text, size);
-              let x=0, y=0, m=margin;
-              if(pos==='br'){ x = width - tw - m; y = m; }
-              if(pos==='bc'){ x = (width - tw)/2; y = m; }
-              if(pos==='bl'){ x = m; y = m; }
-              if(pos==='tr'){ x = width - tw - m; y = height - size - m; }
-              if(pos==='tc'){ x = (width - tw)/2; y = height - size - m; }
-              if(pos==='tl'){ x = m; y = height - size - m; }
-              p.drawText(text, { x, y, size, font: helv, color });
-            });
-            await downloadPdf(out, `NiceDay_Numbered_${Date.now()}.pdf`, 'numbers');
-            status.textContent="Done.";
-          }catch(e){ console.error(e); status.textContent="Error numbering."; }
-        };
+      const reorderState = { order: [], originalBytes: null, pageCount: 0 };
 
-        // === Edit: Watermark
-        wmBtn.onclick = async () => {
-          const status = wmStatus;
-          if(!wmInput.files.length){ status.textContent="Choose a PDF."; return }
-          const text = (wmText.value || 'CONFIDENTIAL').toUpperCase();
-          const angle = parseFloat(wmAngle.value||'45');
-          const alpha = Math.max(0, Math.min(1, parseFloat(wmAlpha.value||'0.15')));
-          const fontSize = Math.max(16, parseInt(wmSize.value,10)||64);
-          try{
-            const bytes = await wmInput.files[0].arrayBuffer();
-            const src = await PDFDocument.load(bytes);
-            const out = await PDFDocument.create();
-            const helvBold = await out.embedFont(StandardFonts.HelveticaBold);
-            const pages = await out.copyPages(src, src.getPageIndices());
-            pages.forEach((p)=>{
-              out.addPage(p);
-              const { width, height } = p.getSize();
-              const tw = helvBold.widthOfTextAtSize(text, fontSize);
-              p.drawText(text, {
-                x:(width - tw)/2, y:height/2, size: fontSize, font: helvBold,
-                color: rgb(0.2,0.2,0.2), rotate: degrees(angle), opacity: alpha
-              });
-            });
-            await downloadPdf(out, `NiceDay_Watermark_${Date.now()}.pdf`, 'watermark');
-            status.textContent="Done.";
-          }catch(e){ console.error(e); status.textContent="Error watermarking."; }
-        };
+      reorderDnDInput?.addEventListener('change', async ()=>{
+        if (!grid) return;
+        grid.innerHTML = ''; reorderDnDStatus && (reorderDnDStatus.textContent = '');
+        const file = reorderDnDInput.files?.[0]; if(!file){ return; }
+        reorderState.originalBytes = await fileToBytes(file);
+        const pdf = await pdfjsLib.getDocument({ data: copyBytes(reorderState.originalBytes) }).promise;
+        reorderState.pageCount = pdf.numPages;
+        reorderState.order = Array.from({length: pdf.numPages}, (_,i)=> i+1);
+        for(let n=1; n<=pdf.numPages; n++){
+          const page = await pdf.getPage(n);
+          const viewport = page.getViewport({ scale: 0.2 });
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = viewport.width; canvas.height = viewport.height;
+          await page.render({ canvasContext: ctx, viewport }).promise;
 
-        // === Secure: Strip Metadata
-        metaBtn.onclick = async ()=> {
-          const status = metaStatus;
-          if(!metaInput.files.length){ status.textContent="Choose a PDF."; return; }
-          try{
-            const bytes = await metaInput.files[0].arrayBuffer();
-            const src = await PDFDocument.load(bytes);
-            const out = await PDFDocument.create();
-            const pages = await out.copyPages(src, src.getPageIndices());
-            pages.forEach(p=> out.addPage(p));
-            await downloadPdf(out, `NiceDay_Clean_${Date.now()}.pdf`, 'meta');
-            status.textContent="Done.";
-          }catch(e){ console.error(e); status.textContent="Error cleaning."; }
-        };
+          const item = document.createElement('div');
+          item.className = 'border rounded-lg p-1 text-center select-none bg-white';
+          item.dataset.page = n;
 
-        // === Secure: Redact
-        const rInput   = document.getElementById('redactInput');
-        const rCanvas  = document.getElementById('redactStage');
-        const rPrev    = document.getElementById('redPrev');
-        const rNext    = document.getElementById('redNext');
-        const rClear   = document.getElementById('redClear');
-        const rApply   = document.getElementById('redApply');
-        const rInfo    = document.getElementById('redInfo');
-        const rStatus  = document.getElementById('redStatus');
+          const img = document.createElement('img');
+          img.src = canvas.toDataURL('image/png'); img.alt = `Page ${n} thumbnail`;
+          img.className = 'thumb w-full rounded';
+          const label = document.createElement('div');
+          label.className = 'text-xs mt-1 text-gray-600'; label.textContent = `Page ${n}`;
 
-        let rPdf = null, rPage = 1;
-        const rectsByPage = [];
-        const renderState = Object.create(null);
-
-        function drawCurrentPage(){
-          if(!rPdf) return;
-          rPdf.getPage(rPage).then(async page=>{
-            const viewport = page.getViewport({ scale: 1.5 });
-            rCanvas.width = viewport.width; rCanvas.height = viewport.height;
-            const ctx = rCanvas.getContext('2d');
-            ctx.clearRect(0,0,rCanvas.width,rCanvas.height);
-            await page.render({ canvasContext: ctx, viewport }).promise;
-            renderState[rPage] = { canvasW: rCanvas.width, canvasH: rCanvas.height };
-            const rects = rectsByPage[rPage]||[];
-            ctx.fillStyle = 'rgba(0,0,0,0.45)';
-            rects.forEach(rc=> ctx.fillRect(rc.x, rc.y, rc.w, rc.h));
-            rInfo.textContent = `Page ${rPage} / ${rPdf.numPages}`;
-          });
+          item.appendChild(img); item.appendChild(label); grid.appendChild(item);
         }
-
-        rInput.addEventListener('change', async ()=> {
-          rStatus.textContent = '';
-          const f = rInput.files[0]; if(!f) return;
-          const bytes = new Uint8Array(await f.arrayBuffer());
-          rCanvas._ndOriginalBytes = bytes.slice(0);
-          rPdf = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
-          rectsByPage.length = rPdf.numPages + 1;
-          rPage = 1; drawCurrentPage();
+        new Sortable(grid, {
+          animation: 150,
+          ghostClass: 'drag-ghost',
+          onSort: () => {
+            reorderState.order = Array.from(grid.children).map(n => parseInt(n.dataset.page, 10));
+          }
         });
+      });
 
-        rPrev.onclick = ()=>{ if(!rPdf) return; rPage = Math.max(1, rPage-1); drawCurrentPage(); };
-        rNext.onclick = ()=>{ if(!rPdf) return; rPage = Math.min(rPdf.numPages, rPage+1); drawCurrentPage(); };
-        rClear.onclick = ()=>{ if(!rPdf) return; rectsByPage[rPage] = []; drawCurrentPage(); };
+      reorderReset?.addEventListener('click', ()=>{
+        if(!reorderState.pageCount || !grid) return;
+        const items = Array.from(grid.children).sort((a,b)=> parseInt(a.dataset.page)-parseInt(b.dataset.page));
+        items.forEach(i=>grid.appendChild(i));
+        reorderState.order = Array.from({length: reorderState.pageCount}, (_,i)=> i+1);
+      });
 
-        (function enableRectDrawing(){
-          let start=null, current=null, drawing=false;
-          rCanvas.addEventListener('mousedown', (e)=>{ if(!rPdf) return;
-            const rect = rCanvas.getBoundingClientRect();
-            start = { x:e.clientX-rect.left, y:e.clientY-rect.top }; drawing=true; });
-          rCanvas.addEventListener('mousemove', (e)=>{ if(!drawing) return;
-            const rect = rCanvas.getBoundingClientRect();
-            current = { x:e.clientX-rect.left, y:e.clientY-rect.top };
-            drawCurrentPage();
-            const ctx = rCanvas.getContext('2d');
-            ctx.fillStyle='rgba(0,0,0,0.45)';
-            const x = Math.min(start.x, current.x), y = Math.min(start.y, current.y);
-            const w = Math.abs(start.x-current.x), h = Math.abs(start.y-current.y);
-            ctx.fillRect(x,y,w,h);
+      reorderExport?.addEventListener('click', async ()=>{
+        if(!reorderState.originalBytes){ reorderDnDStatus && (reorderDnDStatus.textContent = 'Upload a PDF first.'); return; }
+        try{
+          const src = await PDFDocument.load(copyBytes(reorderState.originalBytes));
+          const out = await PDFDocument.create();
+          const total = src.getPageCount();
+          const order = reorderState.order.length ? reorderState.order : Array.from({length: total}, (_,i)=> i+1);
+          const zeroIdx = order.map(n=> Math.min(total, Math.max(1, n)) - 1);
+          const pages = await out.copyPages(src, zeroIdx);
+          pages.forEach(p=> out.addPage(p));
+          await downloadPdf(out, `NiceDay_Reordered_${Date.now()}.pdf`, 'reorder');
+          reorderDnDStatus && (reorderDnDStatus.textContent = 'Done.');
+        }catch(err){ console.error(err); reorderDnDStatus && (reorderDnDStatus.textContent = 'Error exporting.'); }
+      });
+
+      // Edit: Delete
+      const delBtn = document.getElementById('delBtn');
+      const delInput = document.getElementById('delInput');
+      const delList = document.getElementById('delList');
+      const delStatus = document.getElementById('delStatus');
+      delBtn?.addEventListener('click', async () => {
+        const status = delStatus;
+        if(!delInput?.files?.length){ status && (status.textContent="Choose a PDF."); return }
+        try{
+          const bytes = await delInput.files[0].arrayBuffer();
+          const src = await PDFDocument.load(bytes);
+          const total = src.getPageCount();
+          const delRanges = parseRanges(delList?.value);
+          const toDel = new Set();
+          for(const [a,b] of delRanges){ const s=Math.max(1,a), e=Math.min(total,b); for(let i=s;i<=e;i++) toDel.add(i-1); }
+          const out = await PDFDocument.create();
+          const keepIdx = src.getPageIndices().filter(i=>!toDel.has(i));
+          const pages = await out.copyPages(src, keepIdx);
+          pages.forEach(p => out.addPage(p));
+          await downloadPdf(out, `NiceDay_Deleted_${Date.now()}.pdf`, 'del');
+          status && (status.textContent="Done.");
+        }catch(e){ console.error(e); status && (status.textContent="Error deleting."); }
+      });
+
+      // Edit: Extract
+      const extBtn = document.getElementById('extBtn');
+      const extInput = document.getElementById('extInput');
+      const extList = document.getElementById('extList');
+      const extStatus = document.getElementById('extStatus');
+      extBtn?.addEventListener('click', async () => {
+        const status = extStatus;
+        if(!extInput?.files?.length){ status && (status.textContent="Choose a PDF."); return }
+        try{
+          const bytes = await extInput.files[0].arrayBuffer();
+          const src = await PDFDocument.load(bytes);
+          const total = src.getPageCount();
+          const ranges = parseRanges(extList?.value);
+          if(!ranges.length){ status && (status.textContent="Enter valid ranges."); return }
+          const out = await PDFDocument.create();
+          const idxs = [];
+          for(const [a,b] of ranges){ const s=Math.max(1,a), e=Math.min(total,b); for(let i=s;i<=e;i++) idxs.push(i-1); }
+          const pages = await out.copyPages(src, idxs);
+          pages.forEach(p => out.addPage(p));
+          await downloadPdf(out, `NiceDay_Extract_${Date.now()}.pdf`, 'extract');
+          status && (status.textContent="Done.");
+        }catch(e){ console.error(e); status && (status.textContent="Error extracting."); }
+      });
+
+      // Edit: Rotate
+      const rotBtn = document.getElementById('rotBtn');
+      const rotInput = document.getElementById('rotInput');
+      const rotRanges = document.getElementById('rotRanges');
+      const rotAngle = document.getElementById('rotAngle');
+      const rotStatus = document.getElementById('rotStatus');
+      rotBtn?.addEventListener('click', async () => {
+        const status = rotStatus;
+        if(!rotInput?.files?.length){ status && (status.textContent="Choose a PDF."); return }
+        const angle = parseInt(rotAngle?.value||'0',10);
+        const ranges = parseRanges(rotRanges?.value);
+        if(![90,180,270].includes(angle) || !ranges.length){ status && (status.textContent = "Angle 90/180/270 + valid ranges."); return; }
+        try{
+          const bytes = await rotInput.files[0].arrayBuffer();
+          const src = await PDFDocument.load(bytes);
+          const out = await PDFDocument.create();
+          const total = src.getPageCount();
+          const targets = new Set();
+          for(const [a,b] of ranges){ const s=Math.max(1,a), e=Math.min(total,b); for(let i=s;i<=e;i++) targets.add(i-1); }
+          const pages = await out.copyPages(src, src.getPageIndices());
+          pages.forEach((p,idx)=>{ if(targets.has(idx)) p.setRotation(degrees(angle)); out.addPage(p); });
+          await downloadPdf(out, `NiceDay_Rotated_${Date.now()}.pdf`, 'rotate');
+          status && (status.textContent="Done.");
+        }catch(e){ console.error(e); status && (status.textContent="Error rotating."); }
+      });
+
+      // Edit: Page numbers
+      const numBtn = document.getElementById('numBtn');
+      const numInput = document.getElementById('numInput');
+      const numPos = document.getElementById('numPos');
+      const numMargin = document.getElementById('numMargin');
+      const numStatus = document.getElementById('numStatus');
+      numBtn?.addEventListener('click', async () => {
+        const status = numStatus;
+        if(!numInput?.files?.length){ status && (status.textContent="Choose a PDF."); return }
+        try{
+          const bytes = await numInput.files[0].arrayBuffer();
+          const src = await PDFDocument.load(bytes);
+          const out = await PDFDocument.create();
+          const helv = await out.embedFont(StandardFonts.Helvetica);
+          const pages = await out.copyPages(src, src.getPageIndices());
+          const margin = parseFloat(numMargin?.value||'24');
+          const pos = numPos?.value || 'br';
+          const color = rgb(0.2,0.2,0.2);
+          const size = 10;
+          pages.forEach((p,i)=>{
+            out.addPage(p);
+            const { width, height } = p.getSize();
+            const text = `${i+1} / ${pages.length}`;
+            const tw = helv.widthOfTextAtSize(text, size);
+            let x=0, y=0, m=margin;
+            if(pos==='br'){ x = width - tw - m; y = m; }
+            if(pos==='bc'){ x = (width - tw)/2; y = m; }
+            if(pos==='bl'){ x = m; y = m; }
+            if(pos==='tr'){ x = width - tw - m; y = height - size - m; }
+            if(pos==='tc'){ x = (width - tw)/2; y = height - size - m; }
+            if(pos==='tl'){ x = m; y = height - size - m; }
+            p.drawText(text, { x, y, size, font: helv, color });
           });
-          window.addEventListener('mouseup', ()=>{ if(!drawing) return; drawing=false;
-            if(!start || !current) return;
-            const x = Math.min(start.x, current.x), y = Math.min(start.y, current.y);
-            const w = Math.abs(start.x-current.x), h = Math.abs(start.y-current.y);
-            if(!rectsByPage[rPage]) rectsByPage[rPage] = [];
-            rectsByPage[rPage].push({ x, y, w, h });
-            drawCurrentPage();
+          await downloadPdf(out, `NiceDay_Numbered_${Date.now()}.pdf`, 'numbers');
+          status && (status.textContent="Done.");
+        }catch(e){ console.error(e); status && (status.textContent="Error numbering."); }
+      });
+
+      // Edit: Watermark
+      const wmBtn = document.getElementById('wmBtn');
+      const wmInput = document.getElementById('wmInput');
+      const wmText = document.getElementById('wmText');
+      const wmSize = document.getElementById('wmSize');
+      const wmAngle = document.getElementById('wmAngle');
+      const wmAlpha = document.getElementById('wmAlpha');
+      const wmStatus = document.getElementById('wmStatus');
+      wmBtn?.addEventListener('click', async () => {
+        const status = wmStatus;
+        if(!wmInput?.files?.length){ status && (status.textContent="Choose a PDF."); return }
+        const text = (wmText?.value || 'CONFIDENTIAL').toUpperCase();
+        const angle = parseFloat(wmAngle?.value||'45');
+        const alpha = Math.max(0, Math.min(1, parseFloat(wmAlpha?.value||'0.15')));
+        const fontSize = Math.max(16, parseInt(wmSize?.value||'64',10));
+        try{
+          const bytes = await wmInput.files[0].arrayBuffer();
+          const src = await PDFDocument.load(bytes);
+          const out = await PDFDocument.create();
+          const helvBold = await out.embedFont(StandardFonts.HelveticaBold);
+          const pages = await out.copyPages(src, src.getPageIndices());
+          pages.forEach((p)=>{
+            out.addPage(p);
+            const { width, height } = p.getSize();
+            const tw = helvBold.widthOfTextAtSize(text, fontSize);
+            p.drawText(text, {
+              x:(width - tw)/2, y:height/2, size: fontSize, font: helvBold,
+              color: rgb(0.2,0.2,0.2), rotate: degrees(angle), opacity: alpha
+            });
           });
-        })();
+          await downloadPdf(out, `NiceDay_Watermark_${Date.now()}.pdf`, 'watermark');
+          status && (status.textContent="Done.");
+        }catch(e){ console.error(e); status && (status.textContent="Error watermarking."); }
+      });
 
-        rApply.addEventListener('click', async ()=> {
-          if(!rCanvas._ndOriginalBytes){ rStatus.textContent = 'Load a PDF first.'; return; }
-          try{
-            rStatus.textContent = 'Applying…';
-            const src = await PDFDocument.load(copyBytes(rCanvas._ndOriginalBytes), { ignoreEncryption: true });
-            const out = await PDFDocument.create();
-            const idxs = src.getPageIndices();
-            const copied = await out.copyPages(src, idxs);
-            copied.forEach(p => out.addPage(p));
+      // Secure: Strip Metadata
+      const metaBtn = document.getElementById('metaBtn');
+      const metaInput = document.getElementById('metaInput');
+      const metaStatus = document.getElementById('metaStatus');
+      metaBtn?.addEventListener('click', async ()=> {
+        const status = metaStatus;
+        if(!metaInput?.files?.length){ status && (status.textContent="Choose a PDF."); return; }
+        try{
+          const bytes = await metaInput.files[0].arrayBuffer();
+          const src = await PDFDocument.load(bytes);
+          const out = await PDFDocument.create();
+          const pages = await out.copyPages(src, src.getPageIndices());
+          pages.forEach(p=> out.addPage(p));
+          await downloadPdf(out, `NiceDay_Clean_${Date.now()}.pdf`, 'meta');
+          status && (status.textContent="Done.");
+        }catch(e){ console.error(e); status && (status.textContent="Error cleaning."); }
+      });
 
-            function dimsFor(i1){
-              const rs = renderState[i1];
-              if (rs && Number.isFinite(rs.canvasW) && Number.isFinite(rs.canvasH)) return { w: rs.canvasW, h: rs.canvasH };
-              return { w: Math.max(1, rCanvas.width), h: Math.max(1, rCanvas.height) };
-            }
+      // Secure: Redact (draw boxes)
+      const rInput   = document.getElementById('redactInput');
+      const rCanvas  = document.getElementById('redactStage');
+      const rPrev    = document.getElementById('redPrev');
+      const rNext    = document.getElementById('redNext');
+      const rClear   = document.getElementById('redClear');
+      const rApply   = document.getElementById('redApply');
+      const rInfo    = document.getElementById('redInfo');
+      const rStatus  = document.getElementById('redStatus');
 
-            for (let i = 0; i < copied.length; i++){
-              const p = out.getPage(i);
-              const { width, height } = p.getSize();
-              const list = rectsByPage[i+1] || [];
-              if (!list.length) continue;
+      let rPdf = null, rPage = 1;
+      const rectsByPage = [];
+      const renderState = Object.create(null);
 
-              const dims = dimsFor(i+1);
-              const scaleX = width  / dims.w;
-              const scaleY = height / dims.h;
-
-              for (const rc of list){
-                const x = Math.max(0, (rc?.x ?? 0) * scaleX);
-                const y = Math.max(0, (dims.h - (rc?.y ?? 0) - (rc?.h ?? 0)) * scaleY);
-                const w = Math.max(0, (rc?.w ?? 0) * scaleX);
-                const h = Math.max(0, (rc?.h ?? 0) * scaleY);
-                if (!Number.isFinite(x+y+w+h)) continue;
-                p.drawRectangle({ x, y, width: w, height: h, color: rgb(0,0,0) });
-              }
-            }
-
-            const bytes = await out.save();
-            saveBlob(new Blob([bytes], {type:'application/pdf'}), `NiceDay_Redacted_${Date.now()}.pdf`);
-            rStatus.textContent = 'Done.'; showMotivator('redact');
-          }catch(err){ console.error('Redact apply error:', err); rStatus.textContent = 'Error applying redactions.'; }
+      function drawCurrentPage(){
+        if(!rPdf || !rCanvas) return;
+        rPdf.getPage(rPage).then(async page=>{
+          const viewport = page.getViewport({ scale: 1.5 });
+          rCanvas.width = viewport.width; rCanvas.height = viewport.height;
+          const ctx = rCanvas.getContext('2d');
+          ctx.clearRect(0,0,rCanvas.width,rCanvas.height);
+          await page.render({ canvasContext: ctx, viewport }).promise;
+          renderState[rPage] = { canvasW: rCanvas.width, canvasH: rCanvas.height };
+          const rects = rectsByPage[rPage]||[];
+          ctx.fillStyle = 'rgba(0,0,0,0.45)';
+          rects.forEach(rc=> ctx.fillRect(rc.x, rc.y, rc.w, rc.h));
+          rInfo && (rInfo.textContent = `Page ${rPage} / ${rPdf.numPages}`);
         });
-      };
-    });
-  </script>
+      }
+
+      rInput?.addEventListener('change', async ()=>{
+        if(!rCanvas) return;
+        rStatus && (rStatus.textContent = '');
+        const f = rInput.files?.[0]; if(!f) return;
+        const bytes = new Uint8Array(await f.arrayBuffer());
+        rCanvas._ndOriginalBytes = bytes.slice(0);
+        rPdf = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+        rectsByPage.length = rPdf.numPages + 1;
+        rPage = 1; drawCurrentPage();
+      });
+
+      rPrev?.addEventListener('click', ()=>{ if(!rPdf) return; rPage = Math.max(1, rPage-1); drawCurrentPage(); });
+      rNext?.addEventListener('click', ()=>{ if(!rPdf) return; rPage = Math.min(rPdf.numPages, rPage+1); drawCurrentPage(); });
+      rClear?.addEventListener('click', ()=>{ if(!rPdf) return; rectsByPage[rPage] = []; drawCurrentPage(); });
+
+      (function enableRectDrawing(){
+        if(!rCanvas) return;
+        let start=null, current=null, drawing=false;
+        rCanvas.addEventListener('mousedown', (e)=>{ if(!rPdf) return;
+          const rect = rCanvas.getBoundingClientRect();
+          start = { x:e.clientX-rect.left, y:e.clientY-rect.top }; drawing=true; });
+        rCanvas.addEventListener('mousemove', (e)=>{ if(!drawing) return;
+          const rect = rCanvas.getBoundingClientRect();
+          current = { x:e.clientX-rect.left, y:e.clientY-rect.top };
+          drawCurrentPage();
+          const ctx = rCanvas.getContext('2d');
+          ctx.fillStyle='rgba(0,0,0,0.45)';
+          const x = Math.min(start.x, current.x), y = Math.min(start.y, current.y);
+          const w = Math.abs(start.x-current.x), h = Math.abs(start.y-current.y);
+          ctx.fillRect(x,y,w,h);
+        });
+        window.addEventListener('mouseup', ()=>{ if(!drawing) return; drawing=false;
+          if(!start || !current) return;
+          const x = Math.min(start.x, current.x), y = Math.min(start.y, current.y);
+          const w = Math.abs(start.x-current.x), h = Math.abs(start.y-current.y);
+          if(!rectsByPage[rPage]) rectsByPage[rPage] = [];
+          rectsByPage[rPage].push({ x, y, w, h });
+          drawCurrentPage();
+        });
+      })();
+
+      rApply?.addEventListener('click', async ()=>{
+        if(!rCanvas || !rCanvas._ndOriginalBytes){ rStatus && (rStatus.textContent = 'Load a PDF first.'); return; }
+        try{
+          rStatus && (rStatus.textContent = 'Applying…');
+          const src = await PDFDocument.load(copyBytes(rCanvas._ndOriginalBytes), { ignoreEncryption: true });
+          const out = await PDFDocument.create();
+          const idxs = src.getPageIndices();
+          const copied = await out.copyPages(src, idxs);
+          copied.forEach(p => out.addPage(p));
+
+          function dimsFor(i1){
+            const rs = renderState[i1];
+            if (rs && Number.isFinite(rs.canvasW) && Number.isFinite(rs.canvasH)) return { w: rs.canvasW, h: rs.canvasH };
+            return { w: Math.max(1, rCanvas.width), h: Math.max(1, rCanvas.height) };
+          }
+
+          for (let i = 0; i < copied.length; i++){
+            const p = out.getPage(i);
+            const { width, height } = p.getSize();
+            const list = rectsByPage[i+1] || [];
+            if (!list.length) continue;
+
+            const dims = dimsFor(i+1);
+            const scaleX = width  / dims.w;
+            const scaleY = height / dims.h;
+
+            for (const rc of list){
+              const x = Math.max(0, (rc?.x ?? 0) * scaleX);
+              const y = Math.max(0, (dims.h - (rc?.y ?? 0) - (rc?.h ?? 0)) * scaleY);
+              const w = Math.max(0, (rc?.w ?? 0) * scaleX);
+              const h = Math.max(0, (rc?.h ?? 0) * scaleY);
+              if (!Number.isFinite(x+y+w+h)) continue;
+              p.drawRectangle({ x, y, width: w, height: h, color: rgb(0,0,0) });
+            }
+          }
+
+          const bytes = await out.save();
+          saveBlob(new Blob([bytes], {type:'application/pdf'}), `NiceDay_Redacted_${Date.now()}.pdf`);
+          rStatus && (rStatus.textContent = 'Done.');
+          showMotivator('redact');
+        }catch(err){ console.error('Redact apply error:', err); rStatus && (rStatus.textContent = 'Error applying redactions.'); }
+      });
+
+      // finally: signal boot we’re ready (in case pdf-lib loaded first)
+      window.__ndTryStart?.();
+    };
+
+    // If pdf-lib was already loaded before DOMContentLoaded, try start now.
+    window.__ndTryStart?.();
+  });
+</script>
+
 </body>
 </html>
