@@ -13,125 +13,78 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="manifest" href="manifest.webmanifest" />
 
-  <!-- Open Graph / Twitter -->
-  <meta property="og:title" content="NiceDay PDF Jar" />
-  <meta property="og:description" content="Beautiful, fast PDF tools that run entirely on your device." />
-  <meta property="og:type" content="website" />
-  <meta property="og:image" content="icons/icon-512.png" />
-  <meta name="twitter:card" content="summary" />
-
-  <!-- Performance hints -->
+  <!-- Preconnects -->
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
 
-  <!-- Tailwind (production build) -->
+  <!-- Tailwind build (your CSS) -->
   <link rel="stylesheet" href="dist/styles.css" />
 
   <style>
-  :root{
-    --brand:#ffb703; --brand-2:#fb8500;
-    --bg-a:#fff7ea; --bg-b:#fffdf7;
-    --ink:#111827; --muted:#6b7280;
-    color-scheme: light;
-  }
+    :root{
+      --brand:#ffb703; --brand-2:#fb8500;
+      --bg-a:#fff7ea; --bg-b:#fffdf7;
+      --ink:#111827; --muted:#6b7280;
+      color-scheme: light;
+    }
+    html,body{ height:100% }
+    body{
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial;
+      color:var(--ink);
+      background:
+        radial-gradient(1200px 600px at 20% -10%, var(--bg-a), transparent),
+        radial-gradient(1200px 600px at 80% 110%, var(--bg-a), transparent),
+        linear-gradient(180deg, var(--bg-b), #ffffff);
+      min-height:100dvh;
+    }
+    .pill{ background:linear-gradient(90deg,#ffd166,var(--brand)); }
+    .tool-card{ transition:transform .15s ease, box-shadow .15s ease; background:rgba(255,255,255,.82); backdrop-filter: blur(6px); }
+    .tool-card:hover{ transform:translateY(-2px); box-shadow:0 12px 30px rgba(0,0,0,.08); }
+    .grid-tools{ display:grid; grid-template-columns: repeat(auto-fill,minmax(300px,1fr)); gap:1.25rem; }
+    .tab{ border:1px solid #fde68a; background:#fffbea; padding:.5rem .85rem; border-radius:999px; white-space:nowrap; }
+    .tab.active{ background:#ffedd5; border-color:#fdba74; }
+    .hidden-by-filter{ display:none !important; }
+    .tool-title{ display:flex; align-items:center; gap:.5rem; }
+    .tool-title .emoji{ font-size:1.15rem; }
 
-  html,body{ height:100% }
+    /* Modal */
+    .nd-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.35); opacity:0; pointer-events:none; transition:opacity .18s ease; }
+    .nd-overlay.show{ opacity:1; pointer-events:auto; }
+    .nd-modal{ position:fixed; inset:0; display:grid; place-items:center; pointer-events:none; }
+    .nd-card{
+      width:min(92vw,420px); aspect-ratio:1/1;
+      background:linear-gradient(135deg,#fff,#fff8ec);
+      border:1px solid #ffe1b3; border-radius:24px; box-shadow:0 20px 50px rgba(0,0,0,.18);
+      transform:scale(.96); opacity:0; transition:transform .2s ease, opacity .2s ease; pointer-events:auto;
+      display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:22px; text-align:center;
+    }
+    .nd-modal.show .nd-card{ transform:scale(1); opacity:1; }
+    .nd-badge{ font-size:12px; padding:6px 10px; border-radius:999px; color:#0b3b2d; background:linear-gradient(135deg,#d7ffe9,#b9f3d0); border:1px solid #7bdba9; }
+    .nd-cta{ background:#111; color:#fff; padding:10px 14px; border-radius:12px; border:0; cursor:pointer; }
+    .nd-cta:hover{ filter:brightness(1.05); }
+    .nd-confetti{ font-size:40px; line-height:1; }
 
-  body{
-    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial;
-    color:var(--ink);
-    background:
-      radial-gradient(1200px 600px at 20% -10%, var(--bg-a), transparent),
-      radial-gradient(1200px 600px at 80% 110%, var(--bg-a), transparent),
-      linear-gradient(180deg, var(--bg-b), #ffffff);
-    min-height:100dvh;
-  }
+    /* Reorder */
+    #reorderGrid .thumb { aspect-ratio:3/4; touch-action:none; user-select:none; -webkit-user-drag:none; }
+    #reorderGrid img { pointer-events:none; }
+    .drag-ghost{ opacity:.6; transform:scale(.98); }
 
-  .pill{ background:linear-gradient(90deg,#ffd166,var(--brand)); }
+    /* Redact */
+    #redactStage { background:white; border-radius:12px; border:1px solid #e5e7eb; }
+    .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 
-  .tool-card{
-    transition:transform .15s ease, box-shadow .15s ease;
-    background:rgba(255,255,255,.82);
-    backdrop-filter: blur(6px);
-  }
-  .tool-card:hover{ transform:translateY(-2px); box-shadow:0 12px 30px rgba(0,0,0,.08); }
+    footer{ color:var(--muted); }
+    footer a{ text-decoration:underline; text-underline-offset:2px; }
+  </style>
 
-  .grid-tools{ display:grid; grid-template-columns: repeat(auto-fill,minmax(300px,1fr)); gap:1.25rem; }
-
-  .tab{
-    border:1px solid #fde68a;
-    background:#fffbea;
-    padding:.5rem .85rem;
-    border-radius:999px;
-    white-space:nowrap;
-  }
-  .tab.active{ background:#ffedd5; border-color:#fdba74; }
-
-  .hidden-by-filter{ display:none !important; }
-
-  .tool-title{ display:flex; align-items:center; gap:.5rem; }
-  .tool-title .emoji{ font-size:1.15rem; }
-
-  /* Motivator modal */
-  .nd-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.35); opacity:0; pointer-events:none; transition:opacity .18s ease; }
-  .nd-overlay.show{ opacity:1; pointer-events:auto; }
-  .nd-modal{ position:fixed; inset:0; display:grid; place-items:center; pointer-events:none; }
-  .nd-card{
-    width:min(92vw,420px); aspect-ratio:1/1;
-    background:linear-gradient(135deg,#fff,#fff8ec);
-    border:1px solid #ffe1b3; border-radius:24px; box-shadow:0 20px 50px rgba(0,0,0,.18);
-    transform:scale(.96); opacity:0; transition:transform .2s ease, opacity .2s ease; pointer-events:auto;
-    display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:22px; text-align:center;
-  }
-  .nd-modal.show .nd-card{ transform:scale(1); opacity:1; }
-  .nd-badge{
-    font-size:12px; padding:6px 10px; border-radius:999px; color:#0b3b2d;
-    background:linear-gradient(135deg,#d7ffe9,#b9f3d0); border:1px solid #7bdba9;
-  }
-  .nd-cta{ background:#111; color:#fff; padding:10px 14px; border-radius:12px; border:0; cursor:pointer; }
-  .nd-cta:hover{ filter:brightness(1.05); }
-  .nd-confetti{ font-size:40px; line-height:1; }
-
-  /* Reorder thumbnails */
-  #reorderGrid .thumb { aspect-ratio:3/4; touch-action:none; user-select:none; -webkit-user-drag:none; }
-  #reorderGrid img { pointer-events:none; }
-  .drag-ghost{ opacity:.6; transform:scale(.98); }
-
-  /* Redact canvas */
-  #redactStage { background:white; border-radius:12px; border:1px solid #e5e7eb; }
-
-  /* Utility */
-  .sr-only{
-    position:absolute; width:1px; height:1px; padding:0; margin:-1px;
-    overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
-  }
-
-  /* Footer */
-  footer{ color:var(--muted); }
-  footer a{ text-decoration:underline; text-underline-offset:2px; }
-</style>
-
+  <!-- Optional subpath helper (used by app.js too if present) -->
   <script>
-    // Optional subpath support, e.g. window.__ND_BASE_PATH__ = "/NiceDay/"
     (function(){
       const baseAttr = document.documentElement.getAttribute('data-basepath') || "";
       const base = window.__ND_BASE_PATH__ || baseAttr || "";
       window.__ndPath__ = (p) => (base ? ("/" + base.replace(/^\/|\/$/g,"") + "/" + p.replace(/^\/+/,"")) : "/" + p.replace(/^\/+/,""));
     })();
-  </script>
-
-  <script type="application/ld+json">
-  {
-    "@context":"https://schema.org",
-    "@type":"SoftwareApplication",
-    "name":"NiceDay PDF Jar",
-    "applicationCategory":"BusinessApplication",
-    "operatingSystem":"Web",
-    "offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},
-    "description":"On-device PDF tools: create, merge, split, reorder, rotate, number, watermark, compress, export images, redact.",
-    "image":"icons/icon-512.png"
-  }
   </script>
 </head>
 <body>
@@ -141,28 +94,22 @@
   <header class="max-w-6xl mx-auto px-4 pt-8">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
       <div class="flex items-center gap-3">
-        <div class="h-10 w-10 rounded-2xl flex items-center justify-center text-white font-bold text-xl"
-             style="background:linear-gradient(135deg,var(--brand),var(--brand-2))" aria-hidden="true">📄</div>
+        <div class="h-10 w-10 rounded-2xl flex items-center justify-center text-white font-bold text-xl" style="background:linear-gradient(135deg,var(--brand),var(--brand-2))" aria-hidden="true">📄</div>
         <div>
           <h1 class="text-2xl md:text-3xl font-bold">NiceDay PDF Jar</h1>
-          <p class="text-sm text-gray-600 -mt-1 dark:text-gray-400">by <span class="font-semibold">Nice Day</span> — docs & PDFs with sunshine ☀️</p>
+          <p class="text-sm text-gray-600 -mt-1">by <span class="font-semibold">Nice Day</span> — docs & PDFs with sunshine ☀️</p>
         </div>
       </div>
       <div class="flex items-center gap-3">
         <span class="px-3 py-1 rounded-full text-sm pill text-black font-semibold">Always Positive Vibes</span>
-        <button id="installBtn" class="hidden px-3 py-1 rounded-full text-sm border border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20">
-          Install App
-        </button>
+        <button id="installBtn" class="hidden px-3 py-1 rounded-full text-sm border border-amber-300 hover:bg-amber-50">Install App</button>
       </div>
     </div>
 
-    <div class="mt-6 p-5 rounded-2xl border bg-white/70 dark:bg-white/5">
+    <div class="mt-6 p-5 rounded-2xl border bg-white/70">
       <h2 class="text-xl font-semibold">Make beautiful things with your documents — and leave with a smile.</h2>
-      <p class="text-gray-600 mt-2 dark:text-gray-400">
-        Write notes, turn text/markdown into PDFs, and do merge, split, reorder, rotate, number, watermark, compress, export images, and redact — all in your browser.
-      </p>
-      <div id="moodQuote" class="inline-block mt-3 px-3 py-1 rounded-full text-xs text-white"
-           style="background:linear-gradient(135deg,#8ecae6,#219ebc);">Loading inspiration…</div>
+      <p class="text-gray-600 mt-2">Write notes, turn text/markdown into PDFs, and do merge, split, reorder, rotate, number, watermark, compress, export images, and redact — all in your browser.</p>
+      <div id="moodQuote" class="inline-block mt-3 px-3 py-1 rounded-full text-xs text-white" style="background:linear-gradient(135deg,#8ecae6,#219ebc);">Loading inspiration…</div>
     </div>
   </header>
 
@@ -170,8 +117,7 @@
   <div class="max-w-6xl mx-auto px-4 mt-6 mb-4 flex flex-col md:flex-row md:items-center gap-3">
     <div class="relative flex-1">
       <label for="toolSearch" class="sr-only">Search tools</label>
-      <input id="toolSearch" type="search" inputmode="search" placeholder="Search tools (e.g., write, merge, rotate, watermark)…"
-             class="w-full border rounded-xl px-4 py-2 pl-10" />
+      <input id="toolSearch" type="search" inputmode="search" placeholder="Search tools (e.g., write, merge, rotate, watermark)…" class="w-full border rounded-xl px-4 py-2 pl-10" />
       <span class="absolute left-3 top-2.5 text-gray-400" aria-hidden="true">🔎</span>
     </div>
   </div>
@@ -192,10 +138,9 @@
     <!-- === DOCS === -->
     <section class="tabpanel" data-tabpanel="docs" role="region" aria-label="Docs">
       <div class="grid-tools">
-        <!-- Note -> PDF -->
         <div class="tool-card rounded-2xl border p-5 md:col-span-2" data-tags="docs note write text pdf">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">📝</span> Write a Note → PDF</h3>
-          <p class="text-sm text-gray-600 mb-2 dark:text-gray-400">Type your note. We’ll wrap it nicely across A4 pages.</p>
+          <p class="text-sm text-gray-600 mb-2">Type your note. We’ll wrap it nicely across A4 pages.</p>
           <label for="noteInput" class="sr-only">Note content</label>
           <textarea id="noteInput" rows="10" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Type your note here…"></textarea>
           <div class="flex gap-2 mt-3">
@@ -205,19 +150,17 @@
           <p id="noteStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
         </div>
 
-        <!-- TXT/MD -> PDF -->
         <div class="tool-card rounded-2xl border p-5" data-tags="docs text markdown md files pdf">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">📄</span> Text/Markdown files → PDF</h3>
-          <p class="text-sm text-gray-600 mb-2 dark:text-gray-400">Upload .txt / .md files; each becomes a section.</p>
+          <p class="text-sm text-gray-600 mb-2">Upload .txt / .md files; each becomes a section.</p>
           <input id="txtFilesInput" type="file" accept=".txt,.md,text/plain,text/markdown" multiple class="block w-full text-sm" aria-label="Choose text or markdown files"/>
           <button id="txtFilesBtn" class="mt-3 w-full bg-black text-white rounded-lg py-2">Create PDF</button>
           <p id="txtFilesStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
         </div>
 
-        <!-- DOCX placeholder -->
         <div class="tool-card rounded-2xl border p-5 opacity-60" data-tags="docs docx word convert">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">🧩</span> DOCX → PDF</h3>
-          <p class="text-sm text-gray-600 mb-2 dark:text-gray-400">Convert Word to PDF. (Needs extra library/server)</p>
+          <p class="text-sm text-gray-600 mb-2">Convert Word to PDF. (Needs extra library/server)</p>
           <button class="w-full border rounded-lg py-2 cursor-not-allowed" aria-disabled="true">In progress</button>
         </div>
       </div>
@@ -228,7 +171,7 @@
       <div class="grid-tools">
         <div class="tool-card rounded-2xl border p-5" data-tags="convert images">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">🖼️</span> Images → PDF</h3>
-          <p class="text-sm text-gray-600 mb-2 dark:text-gray-400">Turn JPG/PNG images into a single PDF.</p>
+          <p class="text-sm text-gray-600 mb-2">Turn JPG/PNG images into a single PDF.</p>
           <input id="imgInput" type="file" accept="image/*" multiple class="block w-full text-sm" aria-label="Choose images"/>
           <button id="imgBtn" class="mt-3 w-full bg-black text-white rounded-lg py-2">Create PDF & Download</button>
           <p id="imgStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
@@ -236,15 +179,13 @@
 
         <div class="tool-card rounded-2xl border p-5" data-tags="convert pdf images export png jpg">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">🔁</span> PDF → Images (ZIP)</h3>
-          <p class="text-sm text-gray-600 mb-2 dark:text-gray-400">Export each page as PNG or JPG. We’ll bundle them into a .zip.</p>
+          <p class="text-sm text-gray-600 mb-2">Export each page as PNG or JPG. We’ll bundle them into a .zip.</p>
           <input id="pdf2imgInput" type="file" accept="application/pdf" class="block w-full text-sm mb-2" aria-label="Choose PDF" />
           <div class="grid grid-cols-2 gap-2">
-            <label class="sr-only" for="pdf2imgFormat">Image format</label>
             <select id="pdf2imgFormat" class="border rounded-lg px-3 py-2 text-sm">
               <option value="png">PNG</option>
               <option value="jpeg">JPG</option>
             </select>
-            <label class="sr-only" for="pdf2imgScale">Scale</label>
             <select id="pdf2imgScale" class="border rounded-lg px-3 py-2 text-sm">
               <option value="1">Scale 1x</option>
               <option value="1.5">Scale 1.5x</option>
@@ -257,22 +198,15 @@
 
         <div class="tool-card rounded-2xl border p-5" data-tags="convert compress reduce size optimize">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">🪄</span> Compress PDF</h3>
-          <p class="text-sm text-gray-600 mb-2 dark:text-gray-400">Rasterizes pages to JPEG. Lower quality/scale = smaller file.</p>
+          <p class="text-sm text-gray-600 mb-2">Rasterizes pages to JPEG. Lower quality/scale = smaller file.</p>
           <input id="cmpInput" type="file" accept="application/pdf" class="block w-full text-sm mb-2" aria-label="Choose PDF" />
           <div class="grid grid-cols-3 gap-2">
-            <label class="sr-only" for="cmpScale">Scale</label>
             <select id="cmpScale" class="border rounded-lg px-3 py-2 text-sm">
-              <option value="1">Scale 1.0</option>
-              <option value="0.8">0.8</option>
-              <option value="0.6">0.6</option>
-              <option value="0.5">0.5</option>
+              <option value="1">Scale 1.0</option><option value="0.8">0.8</option><option value="0.6">0.6</option><option value="0.5">0.5</option>
             </select>
-            <label class="sr-only" for="cmpQuality">Quality</label>
             <input id="cmpQuality" type="number" min="0.3" max="0.95" step="0.05" value="0.8" class="border rounded-lg px-3 py-2 text-sm" />
-            <label class="sr-only" for="cmpFormat">Format</label>
             <select id="cmpFormat" class="border rounded-lg px-3 py-2 text-sm">
-              <option value="jpeg">JPG</option>
-              <option value="png">PNG (bigger)</option>
+              <option value="jpeg">JPG</option><option value="png">PNG (bigger)</option>
             </select>
           </div>
           <button id="cmpBtn" class="mt-3 w-full bg-black text-white rounded-lg py-2">Compress & Download</button>
@@ -286,7 +220,7 @@
       <div class="grid-tools">
         <div class="tool-card rounded-2xl border p-5" data-tags="organize merge combine">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">➕</span> Merge PDFs</h3>
-          <p class="text-sm text-gray-600 mb-3 dark:text-gray-400">Combine multiple PDFs into one.</p>
+          <p class="text-sm text-gray-600 mb-3">Combine multiple PDFs into one.</p>
           <input id="mergeInput" type="file" multiple accept="application/pdf" class="block w-full text-sm" aria-label="Choose PDFs to merge" />
           <button id="mergeBtn" class="mt-3 w-full bg-black text-white rounded-lg py-2">Merge & Download</button>
           <p id="mergeStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
@@ -294,7 +228,7 @@
 
         <div class="tool-card rounded-2xl border p-5" data-tags="organize split extract">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">✂️</span> Split PDF</h3>
-          <p class="text-sm text-gray-600 mb-2 dark:text-gray-400">Ranges (e.g., 1-3,5,9-10). Each range = separate file.</p>
+          <p class="text-sm text-gray-600 mb-2">Ranges (e.g., 1-3,5,9-10). Each range = separate file.</p>
           <input id="splitInput" type="file" accept="application/pdf" class="block w-full text-sm mb-2" aria-label="Choose PDF to split" />
           <input id="splitRanges" placeholder="1-3,5" class="w-full border rounded-lg px-3 py-2 text-sm" aria-label="Page ranges to split"/>
           <button id="splitBtn" class="mt-3 w-full bg-black text-white rounded-lg py-2">Split & Download</button>
@@ -303,7 +237,7 @@
 
         <div class="tool-card rounded-2xl border p-5 md:col-span-2" data-tags="organize reorder arrange">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">📑</span> Reorder Pages (Drag & Drop)</h3>
-          <p class="text-sm text-gray-600 mb-2 dark:text-gray-400">Upload a PDF, then drag thumbnails to reorder.</p>
+          <p class="text-sm text-gray-600 mb-2">Upload a PDF, then drag thumbnails to reorder.</p>
           <input id="reorderDnDInput" type="file" accept="application/pdf" class="block w-full text-sm mb-3" aria-label="Choose PDF to reorder" />
           <div id="reorderGrid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 min-h-[120px]" aria-live="polite"></div>
           <div class="flex gap-2 mt-3">
@@ -320,7 +254,7 @@
       <div class="grid-tools">
         <div class="tool-card rounded-2xl border p-5" data-tags="edit rotate orientation">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">🔄</span> Rotate Pages</h3>
-          <p class="text-sm text-gray-600 mb-2 dark:text-gray-400">Ranges + angle (90/180/270).</p>
+          <p class="text-sm text-gray-600 mb-2">Ranges + angle (90/180/270).</p>
           <input id="rotInput" type="file" accept="application/pdf" class="block w-full text-sm mb-2" aria-label="Choose PDF to rotate" />
           <div class="flex gap-2">
             <input id="rotRanges" placeholder="1-3,7" class="w-full border rounded-lg px-3 py-2 text-sm" aria-label="Page ranges to rotate"/>
@@ -332,7 +266,7 @@
 
         <div class="tool-card rounded-2xl border p-5" data-tags="edit delete remove">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">🧹</span> Delete Pages</h3>
-          <p class="text-sm text-gray-600 mb-2 dark:text-gray-400">Pages to remove (e.g., 2,4-6).</p>
+          <p class="text-sm text-gray-600 mb-2">Pages to remove (e.g., 2,4-6).</p>
           <input id="delInput" type="file" accept="application/pdf" class="block w-full text-sm mb-2" aria-label="Choose PDF to delete pages from" />
           <input id="delList" placeholder="2,4-6" class="w-full border rounded-lg px-3 py-2 text-sm" aria-label="Pages to delete"/>
           <button id="delBtn" class="mt-3 w-full bg-black text-white rounded-lg py-2">Delete & Download</button>
@@ -341,7 +275,7 @@
 
         <div class="tool-card rounded-2xl border p-5" data-tags="edit extract keep">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">📤</span> Extract Pages</h3>
-          <p class="text-sm text-gray-600 mb-2 dark:text-gray-400">Keep only these pages (e.g., 1-3,9).</p>
+          <p class="text-sm text-gray-600 mb-2">Keep only these pages (e.g., 1-3,9).</p>
           <input id="extInput" type="file" accept="application/pdf" class="block w-full text-sm mb-2" aria-label="Choose PDF to extract pages" />
           <input id="extList" placeholder="1-3,9" class="w-full border rounded-lg px-3 py-2 text-sm" aria-label="Pages to keep"/>
           <button id="extBtn" class="mt-3 w-full bg-black text-white rounded-lg py-2">Extract & Download</button>
@@ -350,16 +284,14 @@
 
         <div class="tool-card rounded-2xl border p-5" data-tags="edit page numbers footer header">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">🔢</span> Add Page Numbers</h3>
-          <p class="text-sm text-gray-600 mb-2 dark:text-gray-400">Position + margin.</p>
+          <p class="text-sm text-gray-600 mb-2">Position + margin.</p>
           <input id="numInput" type="file" accept="application/pdf" class="block w-full text-sm mb-2" aria-label="Choose PDF to number" />
           <div class="grid grid-cols-2 gap-2">
-            <label class="sr-only" for="numPos">Position</label>
             <select id="numPos" class="border rounded-lg px-3 py-2 text-sm">
               <option value="br">Bottom Right</option><option value="bc">Bottom Center</option>
               <option value="bl">Bottom Left</option><option value="tr">Top Right</option>
               <option value="tc">Top Center</option><option value="tl">Top Left</option>
             </select>
-            <label class="sr-only" for="numMargin">Margin</label>
             <input id="numMargin" type="number" value="24" class="border rounded-lg px-3 py-2 text-sm" />
           </div>
           <button id="numBtn" class="mt-3 w-full bg-black text-white rounded-lg py-2">Number & Download</button>
@@ -368,54 +300,17 @@
 
         <div class="tool-card rounded-2xl border p-5" data-tags="edit watermark branding">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">💧</span> Add Watermark</h3>
-          <p class="text-sm text-gray-600 mb-2 dark:text-gray-400">Large diagonal text watermark.</p>
+          <p class="text-sm text-gray-600 mb-2">Large diagonal text watermark.</p>
           <input id="wmInput" type="file" accept="application/pdf" class="block w-full text-sm mb-2" aria-label="Choose PDF to watermark" />
           <input id="wmText" placeholder="CONFIDENTIAL" class="w-full border rounded-lg px-3 py-2 text-sm mb-2" aria-label="Watermark text"/>
           <div class="grid grid-cols-3 gap-2">
-            <label class="sr-only" for="wmSize">Size</label>
             <input id="wmSize" type="number" value="64" class="border rounded-lg px-3 py-2 text-sm" />
-            <label class="sr-only" for="wmAngle">Angle</label>
             <input id="wmAngle" type="number" value="45" class="border rounded-lg px-3 py-2 text-sm" />
-            <label class="sr-only" for="wmAlpha">Opacity</label>
             <input id="wmAlpha" type="number" value="0.15" step="0.05" class="border rounded-lg px-3 py-2 text-sm" />
           </div>
-          <p class="text-xs text-gray-500 mt-1 dark:text-gray-400">Size | Angle° | Opacity (0-1)</p>
+          <p class="text-xs text-gray-500 mt-1">Size | Angle° | Opacity (0-1)</p>
           <button id="wmBtn" class="mt-3 w-full bg-black text-white rounded-lg py-2">Watermark & Download</button>
           <p id="wmStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
-        </div>
-      </div>
-    </section>
-
-    <!-- === SECURE === -->
-    <section class="tabpanel hidden" data-tabpanel="secure" role="region" aria-label="Secure">
-      <div class="grid-tools">
-        <div class="tool-card rounded-2xl border p-5" data-tags="secure privacy metadata strip remove">
-          <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">🧽</span> Strip Metadata</h3>
-          <p class="text-sm text-gray-600 mb-2 dark:text-gray-400">Make a clean copy with no title/author/keywords (fresh PDF with just pages).</p>
-          <input id="metaInput" type="file" accept="application/pdf" class="block w-full text-sm mb-2" aria-label="Choose PDF to clean" />
-          <button id="metaBtn" class="w-full bg-black text-white rounded-lg py-2">Create Clean Copy</button>
-          <p id="metaStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
-        </div>
-
-        <div class="tool-card rounded-2xl border p-5 md:col-span-2" data-tags="secure redact blackout hide">
-          <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">⬛</span> Redact (Draw Boxes)</h3>
-          <p class="text-sm text-gray-600 mb-2 dark:text-gray-400">Load a PDF, draw black rectangles to hide sensitive areas, then export.</p>
-          <input id="redactInput" type="file" accept="application/pdf" class="block w-full text-sm mb-3" aria-label="Choose PDF to redact" />
-          <div class="redact-toolbar flex flex-wrap items-center gap-2 mb-2">
-            <button id="redPrev" class="px-3 py-1 border">◀ Prev</button>
-            <span id="redInfo" class="text-sm text-gray-600 dark:text-gray-400">Page - / -</span>
-            <button id="redNext" class="px-3 py-1 border">Next ▶</button>
-            <button id="redClear" class="ml-2 px-3 py-1 border">Clear on page</button>
-            <button id="redApply" class="px-3 py-1 bg-black text-white rounded-lg">Apply Redactions & Download</button>
-          </div>
-          <canvas id="redactStage" class="w-full max-w-full"></canvas>
-          <p id="redStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
-        </div>
-
-        <div class="tool-card rounded-2xl border p-5 opacity-60" data-tags="secure password encrypt">
-          <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">🔐</span> Encrypt / Set Password</h3>
-          <p class="text-sm text-gray-600 mb-2 dark:text-gray-400">Real PDF encryption needs an extra library/server. (Can wire later)</p>
-          <button class="w-full border rounded-lg py-2 cursor-not-allowed" aria-disabled="true">In progress</button>
         </div>
       </div>
     </section>
@@ -435,7 +330,6 @@
     </div>
   </div>
 
-  <!-- Footer -->
   <footer class="max-w-6xl mx-auto px-4 mt-10 pb-12 text-sm">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
       <div>© <span id="yr"></span> Nice Day. All rights reserved.</div>
@@ -447,773 +341,12 @@
     </div>
   </footer>
 
-  <!-- Libs (pinned; defer) -->
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
-<script>
-  document.addEventListener('DOMContentLoaded', ()=> {
-    if (window.pdfjsLib) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-    }
-  });
-</script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js" crossorigin="anonymous"></script>
+  <!-- Libs -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js" crossorigin="anonymous"></script>
 
-<!-- Boot coordinator: ensure app starts only when DOM + pdf-lib are ready -->
-<script>
-  (function(){
-    window.__ndBoot = { domReady:false, pdfLibReady:false };
-    window.__ndTryStart = function(){
-      if (window.__ndBoot.domReady && window.__ndBoot.pdfLibReady && typeof window.initPDFHandlers === 'function') {
-        // Run once
-        if (!window.__ndBoot.started){
-          window.__ndBoot.started = true;
-          window.initPDFHandlers();
-        }
-      }
-    };
-  })();
-</script>
-
-<!-- pdf-lib robust loader -->
-<script>
-  (function loadPdfLibAndStart(){
-    function start(){
-      if (!window.PDFLib){ alert('pdf-lib failed to load.'); return; }
-      window.__ndBoot.pdfLibReady = true;
-      window.__ndTryStart();
-    }
-    const s=document.createElement('script');
-    s.defer = true;
-    s.src='https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js';
-    s.onload=start;
-    s.onerror=()=>{ 
-      const s2=document.createElement('script'); 
-      s2.defer=true; 
-      s2.src='https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js'; 
-      s2.onload=start; 
-      s2.onerror=()=>alert('Could not load pdf-lib.'); 
-      document.head.appendChild(s2); 
-    };
-    document.head.appendChild(s);
-  })();
-</script>
-
-<!-- App -->
-<script>
-  document.addEventListener('DOMContentLoaded', () => {
-    window.__ndBoot.domReady = true;
-
-    // Footer year (optional element)
-    const yrEl = document.getElementById('yr'); if (yrEl) yrEl.textContent = new Date().getFullYear();
-
-    // Search filter
-    const search = document.getElementById('toolSearch');
-    function applyFilter(){
-      const activeTab = document.querySelector('.tabpanel:not(.hidden)'); if(!activeTab) return;
-      const cards = activeTab.querySelectorAll('.tool-card');
-      const q = (search?.value || '').toLowerCase();
-      cards.forEach(card=>{
-        const tags=(card.dataset.tags||'').toLowerCase();
-        const text=(card.innerText||'').toLowerCase();
-        const ok = !q || text.includes(q) || tags.includes(q);
-        card.classList.toggle('hidden-by-filter', !ok);
-      });
-    }
-    search?.addEventListener('input', applyFilter);
-
-    // Tabs
-    const tabs = document.querySelectorAll('.tab');
-    const panels = document.querySelectorAll('.tabpanel');
-    function showTab(name){
-      tabs.forEach(t=>{
-        const isActive = t.dataset.tab===name;
-        t.classList.toggle('active', isActive);
-        t.setAttribute('aria-pressed', String(isActive));
-      });
-      panels.forEach(p=>p.classList.toggle('hidden', p.dataset.tabpanel!==name));
-      applyFilter();
-    }
-    tabs.forEach(t=>t.addEventListener('click', ()=>showTab(t.dataset.tab)));
-    showTab('docs');
-
-    // Install/PWA (prevents auto banner, shows your button, then calls prompt())
-    const installBtn = document.getElementById('installBtn');
-    let deferredPrompt = null;
-    window.addEventListener('beforeinstallprompt', (e)=>{
-      e.preventDefault();
-      deferredPrompt = e;
-      installBtn?.classList.remove('hidden');
-    });
-    installBtn?.addEventListener('click', async ()=>{
-      if(!deferredPrompt) return;
-      deferredPrompt.prompt();
-      await deferredPrompt.userChoice;
-      deferredPrompt = null;
-      installBtn.classList.add('hidden');
-    });
-    window.addEventListener('appinstalled', ()=> installBtn?.classList.add('hidden'));
-
-    // Service Worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./service-worker.js').catch(console.error);
-    }
-
-    // ===== App logic (will be called by boot once pdf-lib is ready) =====
-    window.initPDFHandlers = function(){
-      const { PDFDocument, StandardFonts, rgb, degrees } = window.PDFLib;
-
-      // Bytes + save helpers
-      async function fileToBytes(file){ const buf = await file.arrayBuffer(); return new Uint8Array(buf); }
-      function copyBytes(u8){ return u8.slice(0); }
-      function saveBlob(blob, filename){
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
-        setTimeout(()=> URL.revokeObjectURL(url), 1000);
-      }
-
-      // Vibes
-      const QUOTES = [
-        "You're doing amazing — keep going! 💪","Small steps create big changes 🌱","Your effort matters more than perfection ✨",
-        "Today is a fresh start — make it count 🌞","You are stronger than you think 💡","Believe in progress, not perfection 🌟",
-        "One positive action can change your whole day 💖"
-      ];
-      const ACTION_TITLES = { note:"Note saved!", text:"Document created!", merge:"PDFs merged!", split:"Pages split!",
-        images:"Images converted!", rotate:"Pages rotated!", reorder:"Pages reordered!", del:"Pages deleted!",
-        extract:"Pages extracted!", numbers:"Numbers added!", watermark:"Watermark added!",
-        pdf2img:"Images exported!", meta:"Clean copy ready!", compress:"PDF compressed!", redact:"Redactions applied!" };
-      const mq = document.getElementById('moodQuote');
-      if (mq) mq.textContent = `Today’s note: ${QUOTES[Math.floor(Math.random()*QUOTES.length)]}`;
-
-      // Motivator modal
-      const overlay = document.getElementById('ndOverlay');
-      const modal   = document.getElementById('ndModal');
-      const titleEl = document.getElementById('ndTitle');
-      const msgEl   = document.getElementById('ndMsg');
-      const closeEl = document.getElementById('ndClose');
-      function showMotivator(kind){ 
-        if (!overlay || !modal) return;
-        if (titleEl) titleEl.textContent = ACTION_TITLES[kind]||"Nice work!";
-        if (msgEl) msgEl.textContent = QUOTES[Math.floor(Math.random()*QUOTES.length)];
-        overlay.classList.add('show'); 
-        modal.style.visibility='visible'; 
-        modal.classList.add('show'); 
-        closeEl?.focus(); 
-      }
-      function hideMotivator(){ 
-        if (!overlay || !modal) return;
-        overlay.classList.remove('show'); 
-        modal.classList.remove('show'); 
-        setTimeout(()=>{ modal.style.visibility='hidden'; },180); 
-      }
-      overlay?.addEventListener('click', hideMotivator); 
-      closeEl?.addEventListener('click', hideMotivator);
-      window.addEventListener('keydown', e=>{ if(e.key==='Escape') hideMotivator(); });
-
-      async function downloadPdf(pdfDoc, filename, kind){
-        const bytes = await pdfDoc.save();
-        saveBlob(new Blob([bytes], { type: 'application/pdf' }), filename);
-        showMotivator(kind);
-      }
-
-      function wrapText(page, text, font, size, x, y, width, leading, color){
-        const words = String(text||'').split(/\s+/);
-        let line = '', ty = y;
-        for(const w of words){
-          const test = line ? line + ' ' + w : w;
-          if(font.widthOfTextAtSize(test, size) > width){
-            if(line) page.drawText(line, { x, y: ty, size, font, color });
-            ty -= leading; line = w;
-          } else line = test;
-        }
-        if(line) page.drawText(line, { x, y: ty, size, font, color });
-        return ty;
-      }
-
-      /* === Wire up all tool buttons/flows (same logic you had) === */
-
-      // DOCS: Note
-      const noteBtn = document.getElementById('noteBtn');
-      const noteInput = document.getElementById('noteInput');
-      const noteTitle = document.getElementById('noteTitle');
-      const noteStatus = document.getElementById('noteStatus');
-      noteBtn?.addEventListener('click', async () => {
-        if(!noteInput) return;
-        const status = noteStatus;
-        const text = noteInput.value.trim();
-        if(!text){ status && (status.textContent = "Type something first."); return; }
-        try{
-          const pdf = await PDFDocument.create();
-          const helv = await pdf.embedFont(StandardFonts.Helvetica);
-          let page = pdf.addPage([595.28, 841.89]);
-          const margin = 50, width = page.getSize().width - margin*2;
-          let y = page.getSize().height - margin - 20;
-          const title = (noteTitle?.value || 'My Note');
-          page.drawText(title, { x: margin, y, size: 18, font: helv, color: rgb(0.1,0.1,0.1) });
-          y -= 28;
-          const paragraphs = text.split(/\n{2,}/);
-          for(const p of paragraphs){
-            const body = p.split(/\n/).join(' ');
-            let ty = wrapText(page, body, helv, 12, margin, y, width, 16, rgb(0.2,0.2,0.2));
-            y = ty - 18;
-            if(y < 60){ page = pdf.addPage([595.28, 841.89]); y = page.getSize().height - margin; }
-          }
-          await downloadPdf(pdf, `NiceDay_Note_${Date.now()}.pdf`, 'note');
-          status && (status.textContent = "Done.");
-        }catch(e){ console.error(e); status && (status.textContent = "Error creating PDF."); }
-      });
-
-      // DOCS: TXT/MD -> PDF
-      const txtFilesBtn = document.getElementById('txtFilesBtn');
-      const txtFilesInput = document.getElementById('txtFilesInput');
-      const txtFilesStatus = document.getElementById('txtFilesStatus');
-      txtFilesBtn?.addEventListener('click', async () => {
-        const status = txtFilesStatus;
-        if(!txtFilesInput?.files?.length){ status && (status.textContent = "Choose .txt or .md files."); return; }
-        try{
-          const pdf = await PDFDocument.create();
-          const helv = await pdf.embedFont(StandardFonts.Helvetica);
-          for(const f of txtFilesInput.files){
-            const text = await f.text();
-            let page = pdf.addPage([595.28, 841.89]);
-            const margin=50, width=page.getSize().width - margin*2;
-            let y = page.getSize().height - margin - 20;
-            page.drawText(f.name, { x: margin, y, size: 16, font: helv, color: rgb(0.1,0.1,0.1) });
-            y -= 24;
-            const blocks = text.split(/\n{2,}/);
-            for(const b of blocks){
-              const body = b.replace(/^#.*$/gm,'').replace(/\*\*(.*?)\*\*/g,'$1');
-              let ty = wrapText(page, body, helv, 12, margin, y, width, 16, rgb(0.2,0.2,0.2));
-              y = ty - 18;
-              if(y < 60){ page = pdf.addPage([595.28, 841.89]); y = page.getSize().height - margin; }
-            }
-          }
-          await downloadPdf(pdf, `NiceDay_Text_${Date.now()}.pdf`, 'text');
-          status && (status.textContent = "Done.");
-        }catch(e){ console.error(e); status && (status.textContent = "Error creating PDF."); }
-      });
-
-      // Convert: Images -> PDF
-      const imgBtn = document.getElementById('imgBtn');
-      const imgInput = document.getElementById('imgInput');
-      const imgStatus = document.getElementById('imgStatus');
-      imgBtn?.addEventListener('click', async () => {
-        const status = imgStatus;
-        if(!imgInput?.files?.length){ status && (status.textContent="Choose images."); return; }
-        try{
-          const out = await PDFDocument.create();
-          for(const f of imgInput.files){
-            const bytes = await f.arrayBuffer();
-            const isPng = (f.type||'').toLowerCase().includes('png');
-            const img = isPng ? await out.embedPng(bytes) : await out.embedJpg(bytes);
-            const page = out.addPage([595.28,841.89]);
-            const maxW=595.28-60, maxH=841.89-60;
-            const r = Math.min(maxW/img.width, maxH/img.height);
-            const w=img.width*r, h=img.height*r;
-            page.drawImage(img,{ x:(595.28-w)/2, y:(841.89-h)/2, width:w, height:h });
-          }
-          await downloadPdf(out, `NiceDay_Images_${Date.now()}.pdf`, 'images');
-          status && (status.textContent="Done.");
-        }catch(e){ console.error(e); status && (status.textContent="Error creating PDF."); }
-      });
-
-      // Convert: PDF -> Images (ZIP)
-      const pdf2imgBtn = document.getElementById('pdf2imgBtn');
-      const pdf2imgInput = document.getElementById('pdf2imgInput');
-      const pdf2imgFormat = document.getElementById('pdf2imgFormat');
-      const pdf2imgScale = document.getElementById('pdf2imgScale');
-      const pdf2imgStatus = document.getElementById('pdf2imgStatus');
-      pdf2imgBtn?.addEventListener('click', async ()=>{
-        const status = pdf2imgStatus;
-        const file = pdf2imgInput?.files && pdf2imgInput.files[0];
-        if(!file){ status && (status.textContent = 'Choose a PDF.'); return; }
-        status && (status.textContent = 'Rendering pages…');
-        try{
-          const data = new Uint8Array(await file.arrayBuffer());
-          const pdf = await pdfjsLib.getDocument({ data }).promise;
-          const zip = new JSZip();
-          const format = pdf2imgFormat?.value || 'png'; // png or jpeg
-          const scale = parseFloat(pdf2imgScale?.value||'1');
-
-          for(let n=1;n<=pdf.numPages;n++){
-            const page = await pdf.getPage(n);
-            const viewport = page.getViewport({ scale: 2 * scale });
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = viewport.width; canvas.height = viewport.height;
-            await page.render({ canvasContext: ctx, viewport }).promise;
-
-            const mime = format==='jpeg' ? 'image/jpeg' : 'image/png';
-            const dataURL = canvas.toDataURL(mime, 0.92);
-            const base64 = dataURL.split(',')[1];
-            const fname = `page_${String(n).padStart(3,'0')}.${format==='jpeg'?'jpg':'png'}`;
-            zip.file(fname, base64, { base64: true });
-          }
-          const blob = await zip.generateAsync({ type:'blob' });
-          saveBlob(blob, `NiceDay_Pages_${Date.now()}.zip`);
-          status && (status.textContent = 'Done.');
-          showMotivator('pdf2img');
-        }catch(e){ console.error(e); status && (status.textContent = 'Error exporting images.'); }
-      });
-
-      // Convert: Compress
-      const cmpBtn = document.getElementById('cmpBtn');
-      const cmpInput = document.getElementById('cmpInput');
-      const cmpScale = document.getElementById('cmpScale');
-      const cmpQuality = document.getElementById('cmpQuality');
-      const cmpFormat = document.getElementById('cmpFormat');
-      const cmpStatus = document.getElementById('cmpStatus');
-      cmpBtn?.addEventListener('click', async ()=>{
-        const status = cmpStatus;
-        if(!cmpInput?.files?.length){ status && (status.textContent='Choose a PDF.'); return; }
-        status && (status.textContent = 'Compressing…');
-        try{
-          const scale = parseFloat(cmpScale?.value||'1');
-          const quality = Math.min(0.95, Math.max(0.3, parseFloat(cmpQuality?.value||'0.8')));
-          const fmt = (cmpFormat?.value||'jpeg'); // 'jpeg' or 'png'
-          const data = new Uint8Array(await cmpInput.files[0].arrayBuffer());
-          const pdf = await pdfjsLib.getDocument({ data }).promise;
-
-          const out = await PDFDocument.create();
-          for(let n=1;n<=pdf.numPages;n++){
-            const page = await pdf.getPage(n);
-            const viewport = page.getViewport({ scale: 2*scale });
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d',{ willReadFrequently:true });
-            canvas.width = viewport.width; canvas.height = viewport.height;
-            await page.render({ canvasContext: ctx, viewport }).promise;
-
-            let bytes, img;
-            if(fmt==='png'){
-              const b64 = canvas.toDataURL('image/png').split(',')[1];
-              bytes = Uint8Array.from(atob(b64), c=>c.charCodeAt(0));
-              img = await out.embedPng(bytes);
-            }else{
-              const b64 = canvas.toDataURL('image/jpeg', quality).split(',')[1];
-              bytes = Uint8Array.from(atob(b64), c=>c.charCodeAt(0));
-              img = await out.embedJpg(bytes);
-            }
-            const pw = img.width, ph = img.height;
-            const pageOut = out.addPage([pw, ph]);
-            pageOut.drawImage(img, { x:0, y:0, width: pw, height: ph });
-          }
-          await downloadPdf(out, `NiceDay_Compressed_${Date.now()}.pdf`, 'compress');
-          status && (status.textContent = 'Done.');
-        }catch(e){ console.error(e); status && (status.textContent='Error compressing.'); }
-      });
-
-      // Helpers
-      function parseRanges(text){
-        const parts = String(text||'').split(',').map(s=>s.trim()).filter(Boolean), out=[];
-        for(const p of parts){
-          if(p.includes('-')){ let [a,b]=p.split('-').map(n=>parseInt(n,10)); if(!isNaN(a)&&!isNaN(b)) out.push([a,b]); }
-          else { let n=parseInt(p,10); if(!isNaN(n)) out.push([n,n]); }
-        }
-        return out;
-      }
-
-      // Organize: Merge
-      const mergeBtn = document.getElementById('mergeBtn');
-      const mergeInput = document.getElementById('mergeInput');
-      const mergeStatus = document.getElementById('mergeStatus');
-      mergeBtn?.addEventListener('click', async () => {
-        const status = mergeStatus;
-        if(!mergeInput?.files || mergeInput.files.length < 2){ status && (status.textContent = "Select at least 2 PDFs."); return }
-        status && (status.textContent = "Merging…");
-        try{
-          const out = await PDFDocument.create();
-          for(const f of mergeInput.files){
-            const bytes = await f.arrayBuffer();
-            const src = await PDFDocument.load(bytes);
-            const pages = await out.copyPages(src, src.getPageIndices());
-            pages.forEach(p => out.addPage(p));
-          }
-          await downloadPdf(out, `NiceDay_Merged_${Date.now()}.pdf`, 'merge');
-          status && (status.textContent = "Done.");
-        }catch(e){ console.error(e); status && (status.textContent = "Error merging."); }
-      });
-
-      // Organize: Split
-      const splitBtn = document.getElementById('splitBtn');
-      const splitInput = document.getElementById('splitInput');
-      const splitRanges = document.getElementById('splitRanges');
-      const splitStatus = document.getElementById('splitStatus');
-      splitBtn?.addEventListener('click', async () => {
-        const status = splitStatus;
-        if(!splitInput?.files?.length){ status && (status.textContent="Choose a PDF."); return }
-        const ranges = parseRanges(splitRanges?.value);
-        if(!ranges.length){ status && (status.textContent="Enter valid ranges."); return }
-        try{
-          const bytes = await splitInput.files[0].arrayBuffer();
-          const src = await PDFDocument.load(bytes);
-          const total = src.getPageCount();
-          for(const [a,b] of ranges){
-            const start=Math.max(1,a), end=Math.min(total,b);
-            const out = await PDFDocument.create();
-            const idxs = Array.from({length:end-start+1},(_,i)=>start-1+i);
-            const pages = await out.copyPages(src, idxs);
-            pages.forEach(p => out.addPage(p));
-            await downloadPdf(out, `NiceDay_Split_${start}-${end}_${Date.now()}.pdf`, 'split');
-          }
-          status && (status.textContent="Done.");
-        }catch(e){ console.error(e); status && (status.textContent="Error splitting."); }
-      });
-
-      // Organize: Reorder (DnD)
-      const reorderDnDInput = document.getElementById('reorderDnDInput');
-      const grid = document.getElementById('reorderGrid');
-      const reorderReset = document.getElementById('reorderReset');
-      const reorderExport = document.getElementById('reorderExport');
-      const reorderDnDStatus = document.getElementById('reorderDnDStatus');
-
-      const reorderState = { order: [], originalBytes: null, pageCount: 0 };
-
-      reorderDnDInput?.addEventListener('change', async ()=>{
-        if (!grid) return;
-        grid.innerHTML = ''; reorderDnDStatus && (reorderDnDStatus.textContent = '');
-        const file = reorderDnDInput.files?.[0]; if(!file){ return; }
-        reorderState.originalBytes = await fileToBytes(file);
-        const pdf = await pdfjsLib.getDocument({ data: copyBytes(reorderState.originalBytes) }).promise;
-        reorderState.pageCount = pdf.numPages;
-        reorderState.order = Array.from({length: pdf.numPages}, (_,i)=> i+1);
-        for(let n=1; n<=pdf.numPages; n++){
-          const page = await pdf.getPage(n);
-          const viewport = page.getViewport({ scale: 0.2 });
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          canvas.width = viewport.width; canvas.height = viewport.height;
-          await page.render({ canvasContext: ctx, viewport }).promise;
-
-          const item = document.createElement('div');
-          item.className = 'border rounded-lg p-1 text-center select-none bg-white';
-          item.dataset.page = n;
-
-          const img = document.createElement('img');
-          img.src = canvas.toDataURL('image/png'); img.alt = `Page ${n} thumbnail`;
-          img.className = 'thumb w-full rounded';
-          const label = document.createElement('div');
-          label.className = 'text-xs mt-1 text-gray-600'; label.textContent = `Page ${n}`;
-
-          item.appendChild(img); item.appendChild(label); grid.appendChild(item);
-        }
-        new Sortable(grid, {
-          animation: 150,
-          ghostClass: 'drag-ghost',
-          onSort: () => {
-            reorderState.order = Array.from(grid.children).map(n => parseInt(n.dataset.page, 10));
-          }
-        });
-      });
-
-      reorderReset?.addEventListener('click', ()=>{
-        if(!reorderState.pageCount || !grid) return;
-        const items = Array.from(grid.children).sort((a,b)=> parseInt(a.dataset.page)-parseInt(b.dataset.page));
-        items.forEach(i=>grid.appendChild(i));
-        reorderState.order = Array.from({length: reorderState.pageCount}, (_,i)=> i+1);
-      });
-
-      reorderExport?.addEventListener('click', async ()=>{
-        if(!reorderState.originalBytes){ reorderDnDStatus && (reorderDnDStatus.textContent = 'Upload a PDF first.'); return; }
-        try{
-          const src = await PDFDocument.load(copyBytes(reorderState.originalBytes));
-          const out = await PDFDocument.create();
-          const total = src.getPageCount();
-          const order = reorderState.order.length ? reorderState.order : Array.from({length: total}, (_,i)=> i+1);
-          const zeroIdx = order.map(n=> Math.min(total, Math.max(1, n)) - 1);
-          const pages = await out.copyPages(src, zeroIdx);
-          pages.forEach(p=> out.addPage(p));
-          await downloadPdf(out, `NiceDay_Reordered_${Date.now()}.pdf`, 'reorder');
-          reorderDnDStatus && (reorderDnDStatus.textContent = 'Done.');
-        }catch(err){ console.error(err); reorderDnDStatus && (reorderDnDStatus.textContent = 'Error exporting.'); }
-      });
-
-      // Edit: Delete
-      const delBtn = document.getElementById('delBtn');
-      const delInput = document.getElementById('delInput');
-      const delList = document.getElementById('delList');
-      const delStatus = document.getElementById('delStatus');
-      delBtn?.addEventListener('click', async () => {
-        const status = delStatus;
-        if(!delInput?.files?.length){ status && (status.textContent="Choose a PDF."); return }
-        try{
-          const bytes = await delInput.files[0].arrayBuffer();
-          const src = await PDFDocument.load(bytes);
-          const total = src.getPageCount();
-          const delRanges = parseRanges(delList?.value);
-          const toDel = new Set();
-          for(const [a,b] of delRanges){ const s=Math.max(1,a), e=Math.min(total,b); for(let i=s;i<=e;i++) toDel.add(i-1); }
-          const out = await PDFDocument.create();
-          const keepIdx = src.getPageIndices().filter(i=>!toDel.has(i));
-          const pages = await out.copyPages(src, keepIdx);
-          pages.forEach(p => out.addPage(p));
-          await downloadPdf(out, `NiceDay_Deleted_${Date.now()}.pdf`, 'del');
-          status && (status.textContent="Done.");
-        }catch(e){ console.error(e); status && (status.textContent="Error deleting."); }
-      });
-
-      // Edit: Extract
-      const extBtn = document.getElementById('extBtn');
-      const extInput = document.getElementById('extInput');
-      const extList = document.getElementById('extList');
-      const extStatus = document.getElementById('extStatus');
-      extBtn?.addEventListener('click', async () => {
-        const status = extStatus;
-        if(!extInput?.files?.length){ status && (status.textContent="Choose a PDF."); return }
-        try{
-          const bytes = await extInput.files[0].arrayBuffer();
-          const src = await PDFDocument.load(bytes);
-          const total = src.getPageCount();
-          const ranges = parseRanges(extList?.value);
-          if(!ranges.length){ status && (status.textContent="Enter valid ranges."); return }
-          const out = await PDFDocument.create();
-          const idxs = [];
-          for(const [a,b] of ranges){ const s=Math.max(1,a), e=Math.min(total,b); for(let i=s;i<=e;i++) idxs.push(i-1); }
-          const pages = await out.copyPages(src, idxs);
-          pages.forEach(p => out.addPage(p));
-          await downloadPdf(out, `NiceDay_Extract_${Date.now()}.pdf`, 'extract');
-          status && (status.textContent="Done.");
-        }catch(e){ console.error(e); status && (status.textContent="Error extracting."); }
-      });
-
-      // Edit: Rotate
-      const rotBtn = document.getElementById('rotBtn');
-      const rotInput = document.getElementById('rotInput');
-      const rotRanges = document.getElementById('rotRanges');
-      const rotAngle = document.getElementById('rotAngle');
-      const rotStatus = document.getElementById('rotStatus');
-      rotBtn?.addEventListener('click', async () => {
-        const status = rotStatus;
-        if(!rotInput?.files?.length){ status && (status.textContent="Choose a PDF."); return }
-        const angle = parseInt(rotAngle?.value||'0',10);
-        const ranges = parseRanges(rotRanges?.value);
-        if(![90,180,270].includes(angle) || !ranges.length){ status && (status.textContent = "Angle 90/180/270 + valid ranges."); return; }
-        try{
-          const bytes = await rotInput.files[0].arrayBuffer();
-          const src = await PDFDocument.load(bytes);
-          const out = await PDFDocument.create();
-          const total = src.getPageCount();
-          const targets = new Set();
-          for(const [a,b] of ranges){ const s=Math.max(1,a), e=Math.min(total,b); for(let i=s;i<=e;i++) targets.add(i-1); }
-          const pages = await out.copyPages(src, src.getPageIndices());
-          pages.forEach((p,idx)=>{ if(targets.has(idx)) p.setRotation(degrees(angle)); out.addPage(p); });
-          await downloadPdf(out, `NiceDay_Rotated_${Date.now()}.pdf`, 'rotate');
-          status && (status.textContent="Done.");
-        }catch(e){ console.error(e); status && (status.textContent="Error rotating."); }
-      });
-
-      // Edit: Page numbers
-      const numBtn = document.getElementById('numBtn');
-      const numInput = document.getElementById('numInput');
-      const numPos = document.getElementById('numPos');
-      const numMargin = document.getElementById('numMargin');
-      const numStatus = document.getElementById('numStatus');
-      numBtn?.addEventListener('click', async () => {
-        const status = numStatus;
-        if(!numInput?.files?.length){ status && (status.textContent="Choose a PDF."); return }
-        try{
-          const bytes = await numInput.files[0].arrayBuffer();
-          const src = await PDFDocument.load(bytes);
-          const out = await PDFDocument.create();
-          const helv = await out.embedFont(StandardFonts.Helvetica);
-          const pages = await out.copyPages(src, src.getPageIndices());
-          const margin = parseFloat(numMargin?.value||'24');
-          const pos = numPos?.value || 'br';
-          const color = rgb(0.2,0.2,0.2);
-          const size = 10;
-          pages.forEach((p,i)=>{
-            out.addPage(p);
-            const { width, height } = p.getSize();
-            const text = `${i+1} / ${pages.length}`;
-            const tw = helv.widthOfTextAtSize(text, size);
-            let x=0, y=0, m=margin;
-            if(pos==='br'){ x = width - tw - m; y = m; }
-            if(pos==='bc'){ x = (width - tw)/2; y = m; }
-            if(pos==='bl'){ x = m; y = m; }
-            if(pos==='tr'){ x = width - tw - m; y = height - size - m; }
-            if(pos==='tc'){ x = (width - tw)/2; y = height - size - m; }
-            if(pos==='tl'){ x = m; y = height - size - m; }
-            p.drawText(text, { x, y, size, font: helv, color });
-          });
-          await downloadPdf(out, `NiceDay_Numbered_${Date.now()}.pdf`, 'numbers');
-          status && (status.textContent="Done.");
-        }catch(e){ console.error(e); status && (status.textContent="Error numbering."); }
-      });
-
-      // Edit: Watermark
-      const wmBtn = document.getElementById('wmBtn');
-      const wmInput = document.getElementById('wmInput');
-      const wmText = document.getElementById('wmText');
-      const wmSize = document.getElementById('wmSize');
-      const wmAngle = document.getElementById('wmAngle');
-      const wmAlpha = document.getElementById('wmAlpha');
-      const wmStatus = document.getElementById('wmStatus');
-      wmBtn?.addEventListener('click', async () => {
-        const status = wmStatus;
-        if(!wmInput?.files?.length){ status && (status.textContent="Choose a PDF."); return }
-        const text = (wmText?.value || 'CONFIDENTIAL').toUpperCase();
-        const angle = parseFloat(wmAngle?.value||'45');
-        const alpha = Math.max(0, Math.min(1, parseFloat(wmAlpha?.value||'0.15')));
-        const fontSize = Math.max(16, parseInt(wmSize?.value||'64',10));
-        try{
-          const bytes = await wmInput.files[0].arrayBuffer();
-          const src = await PDFDocument.load(bytes);
-          const out = await PDFDocument.create();
-          const helvBold = await out.embedFont(StandardFonts.HelveticaBold);
-          const pages = await out.copyPages(src, src.getPageIndices());
-          pages.forEach((p)=>{
-            out.addPage(p);
-            const { width, height } = p.getSize();
-            const tw = helvBold.widthOfTextAtSize(text, fontSize);
-            p.drawText(text, {
-              x:(width - tw)/2, y:height/2, size: fontSize, font: helvBold,
-              color: rgb(0.2,0.2,0.2), rotate: degrees(angle), opacity: alpha
-            });
-          });
-          await downloadPdf(out, `NiceDay_Watermark_${Date.now()}.pdf`, 'watermark');
-          status && (status.textContent="Done.");
-        }catch(e){ console.error(e); status && (status.textContent="Error watermarking."); }
-      });
-
-      // Secure: Strip Metadata
-      const metaBtn = document.getElementById('metaBtn');
-      const metaInput = document.getElementById('metaInput');
-      const metaStatus = document.getElementById('metaStatus');
-      metaBtn?.addEventListener('click', async ()=> {
-        const status = metaStatus;
-        if(!metaInput?.files?.length){ status && (status.textContent="Choose a PDF."); return; }
-        try{
-          const bytes = await metaInput.files[0].arrayBuffer();
-          const src = await PDFDocument.load(bytes);
-          const out = await PDFDocument.create();
-          const pages = await out.copyPages(src, src.getPageIndices());
-          pages.forEach(p=> out.addPage(p));
-          await downloadPdf(out, `NiceDay_Clean_${Date.now()}.pdf`, 'meta');
-          status && (status.textContent="Done.");
-        }catch(e){ console.error(e); status && (status.textContent="Error cleaning."); }
-      });
-
-      // Secure: Redact (draw boxes)
-      const rInput   = document.getElementById('redactInput');
-      const rCanvas  = document.getElementById('redactStage');
-      const rPrev    = document.getElementById('redPrev');
-      const rNext    = document.getElementById('redNext');
-      const rClear   = document.getElementById('redClear');
-      const rApply   = document.getElementById('redApply');
-      const rInfo    = document.getElementById('redInfo');
-      const rStatus  = document.getElementById('redStatus');
-
-      let rPdf = null, rPage = 1;
-      const rectsByPage = [];
-      const renderState = Object.create(null);
-
-      function drawCurrentPage(){
-        if(!rPdf || !rCanvas) return;
-        rPdf.getPage(rPage).then(async page=>{
-          const viewport = page.getViewport({ scale: 1.5 });
-          rCanvas.width = viewport.width; rCanvas.height = viewport.height;
-          const ctx = rCanvas.getContext('2d');
-          ctx.clearRect(0,0,rCanvas.width,rCanvas.height);
-          await page.render({ canvasContext: ctx, viewport }).promise;
-          renderState[rPage] = { canvasW: rCanvas.width, canvasH: rCanvas.height };
-          const rects = rectsByPage[rPage]||[];
-          ctx.fillStyle = 'rgba(0,0,0,0.45)';
-          rects.forEach(rc=> ctx.fillRect(rc.x, rc.y, rc.w, rc.h));
-          rInfo && (rInfo.textContent = `Page ${rPage} / ${rPdf.numPages}`);
-        });
-      }
-
-      rInput?.addEventListener('change', async ()=>{
-        if(!rCanvas) return;
-        rStatus && (rStatus.textContent = '');
-        const f = rInput.files?.[0]; if(!f) return;
-        const bytes = new Uint8Array(await f.arrayBuffer());
-        rCanvas._ndOriginalBytes = bytes.slice(0);
-        rPdf = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
-        rectsByPage.length = rPdf.numPages + 1;
-        rPage = 1; drawCurrentPage();
-      });
-
-      rPrev?.addEventListener('click', ()=>{ if(!rPdf) return; rPage = Math.max(1, rPage-1); drawCurrentPage(); });
-      rNext?.addEventListener('click', ()=>{ if(!rPdf) return; rPage = Math.min(rPdf.numPages, rPage+1); drawCurrentPage(); });
-      rClear?.addEventListener('click', ()=>{ if(!rPdf) return; rectsByPage[rPage] = []; drawCurrentPage(); });
-
-      (function enableRectDrawing(){
-        if(!rCanvas) return;
-        let start=null, current=null, drawing=false;
-        rCanvas.addEventListener('mousedown', (e)=>{ if(!rPdf) return;
-          const rect = rCanvas.getBoundingClientRect();
-          start = { x:e.clientX-rect.left, y:e.clientY-rect.top }; drawing=true; });
-        rCanvas.addEventListener('mousemove', (e)=>{ if(!drawing) return;
-          const rect = rCanvas.getBoundingClientRect();
-          current = { x:e.clientX-rect.left, y:e.clientY-rect.top };
-          drawCurrentPage();
-          const ctx = rCanvas.getContext('2d');
-          ctx.fillStyle='rgba(0,0,0,0.45)';
-          const x = Math.min(start.x, current.x), y = Math.min(start.y, current.y);
-          const w = Math.abs(start.x-current.x), h = Math.abs(start.y-current.y);
-          ctx.fillRect(x,y,w,h);
-        });
-        window.addEventListener('mouseup', ()=>{ if(!drawing) return; drawing=false;
-          if(!start || !current) return;
-          const x = Math.min(start.x, current.x), y = Math.min(start.y, current.y);
-          const w = Math.abs(start.x-current.x), h = Math.abs(start.y-current.y);
-          if(!rectsByPage[rPage]) rectsByPage[rPage] = [];
-          rectsByPage[rPage].push({ x, y, w, h });
-          drawCurrentPage();
-        });
-      })();
-
-      rApply?.addEventListener('click', async ()=>{
-        if(!rCanvas || !rCanvas._ndOriginalBytes){ rStatus && (rStatus.textContent = 'Load a PDF first.'); return; }
-        try{
-          rStatus && (rStatus.textContent = 'Applying…');
-          const src = await PDFDocument.load(copyBytes(rCanvas._ndOriginalBytes), { ignoreEncryption: true });
-          const out = await PDFDocument.create();
-          const idxs = src.getPageIndices();
-          const copied = await out.copyPages(src, idxs);
-          copied.forEach(p => out.addPage(p));
-
-          function dimsFor(i1){
-            const rs = renderState[i1];
-            if (rs && Number.isFinite(rs.canvasW) && Number.isFinite(rs.canvasH)) return { w: rs.canvasW, h: rs.canvasH };
-            return { w: Math.max(1, rCanvas.width), h: Math.max(1, rCanvas.height) };
-          }
-
-          for (let i = 0; i < copied.length; i++){
-            const p = out.getPage(i);
-            const { width, height } = p.getSize();
-            const list = rectsByPage[i+1] || [];
-            if (!list.length) continue;
-
-            const dims = dimsFor(i+1);
-            const scaleX = width  / dims.w;
-            const scaleY = height / dims.h;
-
-            for (const rc of list){
-              const x = Math.max(0, (rc?.x ?? 0) * scaleX);
-              const y = Math.max(0, (dims.h - (rc?.y ?? 0) - (rc?.h ?? 0)) * scaleY);
-              const w = Math.max(0, (rc?.w ?? 0) * scaleX);
-              const h = Math.max(0, (rc?.h ?? 0) * scaleY);
-              if (!Number.isFinite(x+y+w+h)) continue;
-              p.drawRectangle({ x, y, width: w, height: h, color: rgb(0,0,0) });
-            }
-          }
-
-          const bytes = await out.save();
-          saveBlob(new Blob([bytes], {type:'application/pdf'}), `NiceDay_Redacted_${Date.now()}.pdf`);
-          rStatus && (rStatus.textContent = 'Done.');
-          showMotivator('redact');
-        }catch(err){ console.error('Redact apply error:', err); rStatus && (rStatus.textContent = 'Error applying redactions.'); }
-      });
-
-      // finally: signal boot we’re ready (in case pdf-lib loaded first)
-      window.__ndTryStart?.();
-    };
-
-    // If pdf-lib was already loaded before DOMContentLoaded, try start now.
-    window.__ndTryStart?.();
-  });
-</script>
-
+  <!-- App (bundles pdf-lib loader, fontkit, worker config, and all handlers) -->
+  <script defer src="app.js"></script>
 </body>
 </html>
