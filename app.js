@@ -21,22 +21,15 @@
 (function () {
   window.__ndBoot = { domReady: false, pdfLibReady: false, started: false };
   window.__ndTryStart = function () {
-    if (
-      window.__ndBoot.domReady &&
-      window.__ndBoot.pdfLibReady &&
-      typeof window.initPDFHandlers === "function" &&
-      !window.__ndBoot.started
-    ) {
-      window.__ndBoot.started = true;
-      window.initPDFHandlers();
-    }
+    // No-op placeholder – left for compatibility with earlier versions.
+    // All handlers are attached on DOMContentLoaded in this file.
   };
 })();
 
 /* -------------------------- pdf.js worker path -------------------------- */
 document.addEventListener("DOMContentLoaded", () => {
   if (window.pdfjsLib) {
-    // Keep cdnjs worker in sync with the <script> version
+    // Keep cdnjs worker in sync with the <script> version used in index.html
     window.pdfjsLib.GlobalWorkerOptions.workerSrc =
       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
   }
@@ -49,15 +42,6 @@ document.addEventListener("DOMContentLoaded", () => {
       alert("pdf-lib failed to load.");
       return;
     }
-
-    // Expose commonly used helpers so rgb()/degrees() work everywhere
-    const { PDFDocument, StandardFonts, rgb, degrees } = window.PDFLib;
-    window.PDFDocument = PDFDocument;
-    window.StandardFonts = StandardFonts;
-    window.rgb = rgb;
-    window.degrees = degrees;
-
-    // Boot coordination
     window.__ndBoot.pdfLibReady = true;
     window.__ndTryStart();
   }
@@ -75,17 +59,14 @@ document.addEventListener("DOMContentLoaded", () => {
   loadFrom(
     "https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js",
     start,
-    () => loadFrom(
-      "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js",
-      start,
-      () => alert("Could not load pdf-lib.")
-    )
+    () =>
+      loadFrom(
+        "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js",
+        start,
+        () => alert("Could not load pdf-lib.")
+      )
   );
 })();
-
-
-
-
 
 /* ------------------------------- App code ------------------------------- */
 document.addEventListener("DOMContentLoaded", () => {
@@ -239,10 +220,16 @@ document.addEventListener("DOMContentLoaded", () => {
       fetchTTF(p("NotoSans-Regular.ttf")),
       fetchTTF(p("NotoSans-Bold.ttf")),
     ]);
+
+    // Try symbola.ttf first (your earlier naming), then NotoSansSymbols2-Regular.ttf
     try {
       FONT_SYM_BYTES = await fetchTTF(p("symbola.ttf"));
-    } catch (_) {
-      FONT_SYM_BYTES = null; // fallback to primary if missing
+    } catch {
+      try {
+        FONT_SYM_BYTES = await fetchTTF(p("NotoSansSymbols2-Regular.ttf"));
+      } catch {
+        FONT_SYM_BYTES = null; // fallback to primary if missing
+      }
     }
   }
 
@@ -256,9 +243,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Use subset:false for consistent width measurement across lines.
     const font = await pdf.embedFont(FONT_REG_BYTES, { subset: false });
     const fontBold = await pdf.embedFont(FONT_BOLD_BYTES, { subset: false });
-    const fontSym = FONT_SYM_BYTES
-      ? await pdf.embedFont(FONT_SYM_BYTES, { subset: false })
-      : font;
+    const fontSym = FONT_SYM_BYTES ? await pdf.embedFont(FONT_SYM_BYTES, { subset: false }) : font;
     return { font, fontBold, fontSym };
   }
 
@@ -357,7 +342,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /* ----------------------- ==== PDF tool handlers ==== ----------------------- */
-  
 
   /* DOCS: Note → PDF (Unicode-safe) */
   (function () {
@@ -383,13 +367,30 @@ document.addEventListener("DOMContentLoaded", () => {
         let y = page.getSize().height - margin - 20;
 
         const title = noteTitle?.value || "My Note";
-        page.drawText(title, { x: margin, y, size: 18, font: fontBold, color: PDFLib.rgb(0.1, 0.1, 0.1) });
+        page.drawText(title, {
+          x: margin,
+          y,
+          size: 18,
+          font: fontBold,
+          color: PDFLib.rgb(0.1, 0.1, 0.1),
+        });
         y -= 28;
 
         const paragraphs = text.split(/\n{2,}/);
         for (const p of paragraphs) {
           const body = p.split(/\n/).join(" ");
-          let ty = drawUnicodeWrapped(page, body, margin, y, width, 12, 16, font, fontSym, rgb(0.2, 0.2, 0.2));
+          let ty = drawUnicodeWrapped(
+            page,
+            body,
+            margin,
+            y,
+            width,
+            12,
+            16,
+            font,
+            fontSym,
+            PDFLib.rgb(0.2, 0.2, 0.2)
+          );
           y = ty - 18;
           if (y < 60) {
             page = pdf.addPage([595.28, 841.89]);
@@ -426,13 +427,30 @@ document.addEventListener("DOMContentLoaded", () => {
             width = page.getSize().width - margin * 2;
           let y = page.getSize().height - margin - 20;
 
-          page.drawText(f.name, { x: margin, y, size: 16, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+          page.drawText(f.name, {
+            x: margin,
+            y,
+            size: 16,
+            font: fontBold,
+            color: PDFLib.rgb(0.1, 0.1, 0.1),
+          });
           y -= 24;
 
           const blocks = text.split(/\n{2,}/);
           for (const b of blocks) {
             const body = b.replace(/^#.*$/gm, "").replace(/\*\*(.*?)\*\*/g, "$1").split(/\n/).join(" ");
-            let ty = drawUnicodeWrapped(page, body, margin, y, width, 12, 16, font, fontSym, rgb(0.2, 0.2, 0.2));
+            let ty = drawUnicodeWrapped(
+              page,
+              body,
+              margin,
+              y,
+              width,
+              12,
+              16,
+              font,
+              fontSym,
+              PDFLib.rgb(0.2, 0.2, 0.2)
+            );
             y = ty - 18;
             if (y < 60) {
               page = pdf.addPage([595.28, 841.89]);
@@ -713,7 +731,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     btnReset?.addEventListener("click", () => {
       if (!reorderState.pageCount || !grid) return;
-      const items = Array.from(grid.children).sort((a, b) => parseInt(a.dataset.page) - parseInt(b.dataset.page));
+      const items = Array.from(grid.children).sort(
+        (a, b) => parseInt(a.dataset.page) - parseInt(b.dataset.page)
+      );
       items.forEach((i) => grid.appendChild(i));
       reorderState.order = Array.from({ length: reorderState.pageCount }, (_, i) => i + 1);
     });
@@ -849,7 +869,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         const pages = await out.copyPages(src, src.getPageIndices());
         pages.forEach((p, idx) => {
-          if (targets.has(idx)) p.setRotation(degrees(angle));
+          if (targets.has(idx)) p.setRotation(PDFLib.degrees(angle));
           out.addPage(p);
         });
         await downloadPdf(out, `NiceDay_Rotated_${Date.now()}.pdf`, "rotate");
@@ -960,8 +980,8 @@ document.addEventListener("DOMContentLoaded", () => {
             y: height / 2,
             size: fontSize,
             font: fontBold,
-            color: rgb(0.2, 0.2, 0.2),
-            rotate: degrees(angle),
+            color: PDFLib.rgb(0.2, 0.2, 0.2),
+            rotate: PDFLib.degrees(angle),
             opacity: alpha,
           });
         });
@@ -1108,7 +1128,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       try {
         rStatus && (rStatus.textContent = "Applying…");
-        const src = await PDFLib.PDFDocument.load(rCanvas._ndOriginalBytes.slice(0), { ignoreEncryption: true });
+        const src = await PDFLib.PDFDocument.load(rCanvas._ndOriginalBytes.slice(0), {
+                    ignoreEncryption: true
+        });
         const out = await PDFLib.PDFDocument.create();
         const idxs = src.getPageIndices();
         const copied = await out.copyPages(src, idxs);
@@ -1116,7 +1138,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         function dimsFor(i1) {
           const rs = renderState[i1];
-          if (rs && Number.isFinite(rs.canvasW) && Number.isFinite(rs.canvasH)) return { w: rs.canvasW, h: rs.canvasH };
+          if (rs && Number.isFinite(rs.canvasW) && Number.isFinite(rs.canvasH)) {
+            return { w: rs.canvasW, h: rs.canvasH };
+          }
           return { w: Math.max(1, rCanvas.width), h: Math.max(1, rCanvas.height) };
         }
 
@@ -1136,18 +1160,12 @@ document.addEventListener("DOMContentLoaded", () => {
             const w = Math.max(0, (rc?.w ?? 0) * scaleX);
             const h = Math.max(0, (rc?.h ?? 0) * scaleY);
             if (!Number.isFinite(x + y + w + h)) continue;
-            p.drawRectangle({ x, y, width: w, height: h, color: rgb(0, 0, 0) });
+            p.drawRectangle({ x, y, width: w, height: h, color: PDFLib.rgb(0, 0, 0) });
           }
         }
 
         const bytes = await out.save();
-        const blob = new Blob([bytes], { type: "application/pdf" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `NiceDay_Redacted_${Date.now()}.pdf`;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        saveBlob(new Blob([bytes], { type: "application/pdf" }), `NiceDay_Redacted_${Date.now()}.pdf`);
         rStatus && (rStatus.textContent = "Done.");
         showMotivator("redact");
       } catch (err) {
@@ -1160,3 +1178,4 @@ document.addEventListener("DOMContentLoaded", () => {
   /* ------------------------- kick off if ready -------------------------- */
   window.__ndTryStart?.();
 });
+
