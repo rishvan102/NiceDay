@@ -125,8 +125,7 @@
   <header class="max-w-6xl mx-auto px-4 pt-8">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
       <div class="flex items-center gap-3">
-        <div class="h-10 w-10 rounded-2xl flex items-center justify-center text-white font-bold text-xl"
-             style="background:linear-gradient(135deg,var(--brand),var(--brand-2))" aria-hidden="true">📄</div>
+        <div class="h-10 w-10 rounded-2xl flex items-center justify-center text-white font-bold text-xl" style="background:linear-gradient(135deg,var(--brand),var(--brand-2))" aria-hidden="true">📄</div>
         <div>
           <h1 class="text-2xl md:text-3xl font-bold">NiceDay PDF Jar</h1>
           <p class="text-sm text-gray-600 -mt-1">by <span class="font-semibold">Nice Day</span> — docs & PDFs with sunshine ☀️</p>
@@ -141,8 +140,7 @@
     <div class="mt-6 p-5 rounded-2xl border bg-white/70">
       <h2 class="text-xl font-semibold">Make beautiful things with your documents — and leave with a smile.</h2>
       <p class="text-gray-600 mt-2">Write notes, turn text/markdown into PDFs, and do merge, split, reorder, rotate, number, watermark, compress, export images, and redact — all in your browser.</p>
-      <div id="moodQuote" class="inline-block mt-3 px-3 py-1 rounded-full text-xs text-white"
-           style="background:linear-gradient(135deg,#8ecae6,#219ebc);">Loading inspiration…</div>
+      <div id="moodQuote" class="inline-block mt-3 px-3 py-1 rounded-full text-xs text-white" style="background:linear-gradient(135deg,#8ecae6,#219ebc);">Loading inspiration…</div>
     </div>
   </header>
 
@@ -150,9 +148,7 @@
   <div class="max-w-6xl mx-auto px-4 mt-6 mb-4 flex flex-col md:flex-row md:items-center gap-3">
     <div class="relative flex-1">
       <label for="toolSearch" class="sr-only">Search tools</label>
-      <input id="toolSearch" type="search" inputmode="search"
-             placeholder="Search tools (e.g., write, merge, rotate, watermark)…"
-             class="w-full border rounded-xl px-4 py-2 pl-10" />
+      <input id="toolSearch" type="search" inputmode="search" placeholder="Search tools (e.g., write, merge, rotate, watermark)…" class="w-full border rounded-xl px-4 py-2 pl-10" />
       <span class="absolute left-3 top-2.5 text-gray-400" aria-hidden="true">🔎</span>
     </div>
   </div>
@@ -204,6 +200,21 @@
     <!-- === CONVERT === -->
     <section class="tabpanel hidden" data-tabpanel="convert" role="region" aria-label="Convert">
       <div class="grid-tools">
+        <!-- Scan to PDF -->
+        <div class="tool-card rounded-2xl border p-5 md:col-span-2" data-tags="convert scan camera">
+          <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">📷</span> Scan to PDF (Camera)</h3>
+          <p class="text-sm text-gray-600 mb-2">Capture pages from your camera, then export to PDF.</p>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="scanStart" class="px-3 py-2 border rounded-lg">Start Camera</button>
+            <button id="scanSnap" class="px-3 py-2 border rounded-lg">Take Snapshot</button>
+          </div>
+          <video id="scanVideo" class="w-full rounded-lg mt-2" autoplay playsinline></video>
+          <div id="scanThumbs" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 mt-3"></div>
+          <button id="scanExport" class="mt-3 w-full bg-black text-white rounded-lg py-2">Export PDF</button>
+          <p id="scanStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
+        </div>
+
+        <!-- Images -> PDF -->
         <div class="tool-card rounded-2xl border p-5" data-tags="convert images">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">🖼️</span> Images → PDF</h3>
           <p class="text-sm text-gray-600 mb-2">Turn JPG/PNG images into a single PDF.</p>
@@ -212,6 +223,7 @@
           <p id="imgStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
         </div>
 
+        <!-- PDF -> Images -->
         <div class="tool-card rounded-2xl border p-5" data-tags="convert pdf images export png jpg">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">🔁</span> PDF → Images (ZIP)</h3>
           <p class="text-sm text-gray-600 mb-2">Export each page as PNG or JPG. We’ll bundle them into a .zip.</p>
@@ -231,6 +243,7 @@
           <p id="pdf2imgStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
         </div>
 
+        <!-- Compress -->
         <div class="tool-card rounded-2xl border p-5" data-tags="convert compress reduce size optimize">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">🪄</span> Compress PDF</h3>
           <p class="text-sm text-gray-600 mb-2">Rasterizes pages to JPEG. Lower quality/scale = smaller file.</p>
@@ -270,6 +283,23 @@
           <p id="splitStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
         </div>
 
+        <!-- Insert blank pages -->
+        <div class="tool-card rounded-2xl border p-5" data-tags="organize insert blank page">
+          <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">🧾</span> Insert Blank Pages</h3>
+          <p class="text-sm text-gray-600 mb-2">Insert N blank A4 pages before/after a page number.</p>
+          <input id="blankInput" type="file" accept="application/pdf" class="block w-full text-sm mb-2" aria-label="Choose PDF" />
+          <div class="grid grid-cols-3 gap-2">
+            <input id="blankAt" type="number" min="1" placeholder="At page" class="border rounded-lg px-3 py-2 text-sm" />
+            <select id="blankWhere" class="border rounded-lg px-3 py-2 text-sm">
+              <option value="before">Before</option>
+              <option value="after">After</option>
+            </select>
+            <input id="blankCount" type="number" min="1" value="1" class="border rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <button id="blankBtn" class="mt-3 w-full bg-black text-white rounded-lg py-2">Insert & Download</button>
+          <p id="blankStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
+        </div>
+
         <div class="tool-card rounded-2xl border p-5 md:col-span-2" data-tags="organize reorder arrange">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">📑</span> Reorder Pages (Drag & Drop)</h3>
           <p class="text-sm text-gray-600 mb-2">Upload a PDF, then drag thumbnails to reorder.</p>
@@ -281,12 +311,25 @@
           </div>
           <p id="reorderDnDStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
         </div>
+
+        
+
+        <!-- Duplicate pages -->
+        <div class="tool-card rounded-2xl border p-5" data-tags="organize duplicate copy pages">
+          <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">📚</span> Duplicate Pages</h3>
+          <p class="text-sm text-gray-600 mb-2">Ranges to duplicate (e.g., 2,4-5). Duplicates will be appended.</p>
+          <input id="dupInput" type="file" accept="application/pdf" class="block w-full text-sm mb-2" aria-label="Choose PDF" />
+          <input id="dupRanges" placeholder="2,4-5" class="w-full border rounded-lg px-3 py-2 text-sm" aria-label="Pages to duplicate"/>
+          <button id="dupBtn" class="mt-3 w-full bg-black text-white rounded-lg py-2">Duplicate & Download</button>
+          <p id="dupStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
+        </div>
       </div>
     </section>
 
     <!-- === EDIT === -->
     <section class="tabpanel hidden" data-tabpanel="edit" role="region" aria-label="Edit">
-      <div class="grid-tools">
+      <div class="grid-tools edit-grid">
+        <!-- Rotate -->
         <div class="tool-card rounded-2xl border p-5" data-tags="edit rotate orientation">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">🔄</span> Rotate Pages</h3>
           <p class="text-sm text-gray-600 mb-2">Ranges + angle (90/180/270).</p>
@@ -299,6 +342,7 @@
           <p id="rotStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
         </div>
 
+        <!-- Delete -->
         <div class="tool-card rounded-2xl border p-5" data-tags="edit delete remove">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">🧹</span> Delete Pages</h3>
           <p class="text-sm text-gray-600 mb-2">Pages to remove (e.g., 2,4-6).</p>
@@ -308,6 +352,7 @@
           <p id="delStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
         </div>
 
+        <!-- Extract -->
         <div class="tool-card rounded-2xl border p-5" data-tags="edit extract keep">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">📤</span> Extract Pages</h3>
           <p class="text-sm text-gray-600 mb-2">Keep only these pages (e.g., 1-3,9).</p>
@@ -317,6 +362,7 @@
           <p id="extStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
         </div>
 
+        <!-- Page Numbers -->
         <div class="tool-card rounded-2xl border p-5" data-tags="edit page numbers footer header">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">🔢</span> Add Page Numbers</h3>
           <p class="text-sm text-gray-600 mb-2">Position + margin.</p>
@@ -333,6 +379,7 @@
           <p id="numStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
         </div>
 
+        <!-- Watermark -->
         <div class="tool-card rounded-2xl border p-5" data-tags="edit watermark branding">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">💧</span> Add Watermark</h3>
           <p class="text-sm text-gray-600 mb-2">Large diagonal text watermark.</p>
@@ -348,10 +395,10 @@
           <p id="wmStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
         </div>
 
-        <!-- Compact row: Crop / Text Stamp / Signature -->
+        <!-- Crop (compact) -->
         <div class="tool-card rounded-2xl border p-5 compact" data-tags="edit crop margins">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">✂️</span> Crop Margins</h3>
-          <p class="text-sm text-gray-600 mb-2">Remove margins (points). Applies to all pages.</p>
+          <p class="text-sm text-gray-600 mb-2">Set margins to remove (points). Applies to all pages.</p>
           <input id="cropInput" type="file" accept="application/pdf" class="block w-full text-sm mb-2" aria-label="Choose PDF" />
           <div class="grid grid-cols-4 gap-2">
             <input id="cropTop" type="number" min="0" placeholder="Top" class="border rounded-lg px-3 py-2 text-sm" />
@@ -363,6 +410,7 @@
           <p id="cropStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
         </div>
 
+        <!-- Text Stamp (compact) -->
         <div class="tool-card rounded-2xl border p-5 compact" data-tags="edit text stamp label">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">🏷️</span> Add Text Stamp</h3>
           <p class="text-sm text-gray-600 mb-2">Add a small label on every page.</p>
@@ -382,55 +430,76 @@
         </div>
 
         <div class="tool-card rounded-2xl border p-5 compact" data-tags="edit sign signature image">
-          <h3 class="tool-title font-semibold text-lg mb-2">
-            <span class="emoji" aria-hidden="true">✍️</span> Add Signature (PNG)
-          </h3>
-          <p class="text-sm text-gray-600 mb-3">Place a transparent PNG signature on all pages (bottom-right by default).</p>
+  <h3 class="tool-title font-semibold text-lg mb-2">
+    <span class="emoji" aria-hidden="true">✍️</span> Add Signature (PNG)
+  </h3>
+  <p class="text-sm text-gray-600 mb-3">
+    Place a transparent PNG signature on all pages (bottom-right by default).
+  </p>
 
-          <!-- Step 1: PDF -->
-          <div class="mb-2">
-            <label for="signPdfInput" class="block text-sm font-semibold text-gray-700">1) Choose PDF</label>
-            <p class="text-xs text-gray-500 mb-1">The document you want to sign.</p>
-            <input id="signPdfInput" type="file" accept="application/pdf" class="block w-full text-sm"
-                   aria-describedby="signPdfHelp" aria-label="Choose PDF to sign" />
-            <span id="signPdfHelp" class="sr-only">Choose the PDF file to sign</span>
-          </div>
+  <!-- Step 1: PDF -->
+  <div class="mb-2">
+    <label for="signPdfInput" class="block text-sm font-semibold text-gray-700">
+      1) Choose PDF
+    </label>
+    <p class="text-xs text-gray-500 mb-1">The document you want to sign.</p>
+    <input id="signPdfInput"
+           type="file"
+           accept="application/pdf"
+           class="block w-full text-sm"
+           aria-describedby="signPdfHelp"
+           aria-label="Choose PDF to sign" />
+    <span id="signPdfHelp" class="sr-only">Choose the PDF file to sign</span>
+  </div>
 
-          <!-- Step 2: Signature image -->
-          <div class="mb-2">
-            <label for="signImgInput" class="block text-sm font-semibold text-gray-700">2) Signature image (PNG)</label>
-            <p class="text-xs text-gray-500 mb-1">Use a PNG with transparent background for best results.</p>
-            <input id="signImgInput" type="file" accept="image/png,image/jpeg" class="block w-full text-sm"
-                   aria-describedby="signImgHelp" aria-label="Choose signature image" />
-            <span id="signImgHelp" class="sr-only">Choose your signature image</span>
-          </div>
+  <!-- Step 2: Signature image -->
+  <div class="mb-2">
+    <label for="signImgInput" class="block text-sm font-semibold text-gray-700">
+      2) Signature image (PNG)
+    </label>
+    <p class="text-xs text-gray-500 mb-1">
+      Use a PNG with transparent background for best results.
+    </p>
+    <input id="signImgInput"
+           type="file"
+           accept="image/png,image/jpeg"
+           class="block w-full text-sm"
+           aria-describedby="signImgHelp"
+           aria-label="Choose signature image" />
+    <span id="signImgHelp" class="sr-only">Choose your signature image</span>
+  </div>
 
-          <div class="grid grid-cols-3 gap-2 mt-2">
-            <div>
-              <label for="signWidth" class="block text-xs font-medium text-gray-600 mb-1">Width (px)</label>
-              <input id="signWidth" type="number" value="120" class="border rounded-lg px-3 py-2 text-sm w-full" />
-            </div>
-            <div>
-              <label for="signMarginX" class="block text-xs font-medium text-gray-600 mb-1">Margin X</label>
-              <input id="signMarginX" type="number" value="24" class="border rounded-lg px-3 py-2 text-sm w-full" />
-            </div>
-            <div>
-              <label for="signMarginY" class="block text-xs font-medium text-gray-600 mb-1">Margin Y</label>
-              <input id="signMarginY" type="number" value="24" class="border rounded-lg px-3 py-2 text-sm w-full" />
-            </div>
-          </div>
-          <p class="text-xs text-gray-500 mt-1">Width(px) • Margin X/Y (from bottom-right).</p>
+  <!-- Size & margins -->
+  <div class="grid grid-cols-3 gap-2 mt-2">
+    <div>
+      <label for="signWidth" class="block text-xs font-medium text-gray-600 mb-1">Width (px)</label>
+      <input id="signWidth" type="number" value="120" class="border rounded-lg px-3 py-2 text-sm w-full" />
+    </div>
+    <div>
+      <label for="signMarginX" class="block text-xs font-medium text-gray-600 mb-1">Margin X</label>
+      <input id="signMarginX" type="number" value="24" class="border rounded-lg px-3 py-2 text-sm w-full" />
+    </div>
+    <div>
+      <label for="signMarginY" class="block text-xs font-medium text-gray-600 mb-1">Margin Y</label>
+      <input id="signMarginY" type="number" value="24" class="border rounded-lg px-3 py-2 text-sm w-full" />
+    </div>
+  </div>
+  <p class="text-xs text-gray-500 mt-1">
+    Width(px) • Margin X/Y (from bottom-right).
+  </p>
 
-          <button id="signBtn" class="mt-3 w-full bg-black text-white rounded-lg py-2">Sign & Download</button>
-          <p id="signStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
-        </div>
+  <button id="signBtn" class="mt-3 w-full bg-black text-white rounded-lg py-2">
+    Sign & Download
+  </button>
+  <p id="signStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
+</div>
 
-      </div>
     </section>
 
     <!-- === SECURE === -->
     <section class="tabpanel hidden" data-tabpanel="secure" role="region" aria-label="Secure">
       <div class="grid-tools">
+        <!-- Strip metadata -->
         <div class="tool-card rounded-2xl border p-5" data-tags="secure metadata privacy remove info">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">🧼</span> Strip Metadata</h3>
           <p class="text-sm text-gray-600 mb-2">Make a clean copy without document metadata.</p>
@@ -439,6 +508,7 @@
           <p id="metaStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
         </div>
 
+        <!-- Redact -->
         <div class="tool-card rounded-2xl border p-5 md:col-span-2" data-tags="secure redact hide black box">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">🕶️</span> Redact (Draw Boxes)</h3>
           <p class="text-sm text-gray-600 mb-2">Load a PDF, draw black boxes over sensitive areas, then apply.</p>
@@ -506,3 +576,4 @@
   </script>
 </body>
 </html>
+
