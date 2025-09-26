@@ -667,6 +667,141 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   })();
 
+  (function () {
+  const startBtn = document.getElementById("scanStart");
+  const snapBtn = document.getElementById("scanSnap");
+  const exportBtn = document.getElementById("scanExport");
+  const video = document.getElementById("scanVideo");
+  const thumbs = document.getElementById("scanThumbs");
+  const statusEl = document.getElementById("scanStatus");
+  let stream = null;
+  const shots = []; // {w,h,bytes(type png)}
+
+  startBtn?.addEventListener("click", async () => {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+      video.srcObject = stream;
+      statusEl && (statusEl.textContent = "Camera ready.");
+    } catch (e) {
+      console.error(e);
+      statusEl && (statusEl.textContent = "Camera access denied/unavailable.");
+    }
+  });
+
+  snapBtn?.addEventListener("click", () => {
+    if (!video?.videoWidth) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0);
+    const b64 = canvas.toDataURL("image/jpeg", 0.92).split(",")[1];
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    shots.push({ w: canvas.width, h: canvas.height, bytes });
+    const img = new Image();
+    img.src = "data:image/jpeg;base64," + b64;
+    img.className = "thumb w-full rounded";
+    thumbs.appendChild(img);
+  });
+
+  exportBtn?.addEventListener("click", async () => {
+    if (!shots.length) return statusEl && (statusEl.textContent = "Take at least one snapshot.");
+    statusEl && (statusEl.textContent = "Building PDF…");
+    try {
+      const out = await PDFLib.PDFDocument.create();
+      for (const s of shots) {
+        const jpg = await out.embedJpg(s.bytes);
+        const page = out.addPage([595.28, 841.89]);
+        const maxW = 595.28 - 60, maxH = 841.89 - 60;
+        const ratio = Math.min(maxW / jpg.width, maxH / jpg.height);
+        const w = jpg.width * ratio, h = jpg.height * ratio;
+        page.drawImage(jpg, { x: (595.28 - w)/2, y: (841.89 - h)/2, width: w, height: h });
+      }
+      await downloadPdf(out, `NiceDay_Scan_${Date.now()}.pdf`, "images");
+      statusEl && (statusEl.textContent = "Done.");
+    } catch (e) {
+      console.error(e);
+      statusEl && (statusEl.textContent = "Error exporting.");
+    } finally {
+      if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+      video.srcObject = null;
+    }
+  });
+})();
+
+//org
+  (function () {
+  const btn = document.getElementById("blankBtn");
+  const input = document.getElementById("blankInput");
+  const atEl = document.getElementById("blankAt");
+  const whereEl = document.getElementById("blankWhere");
+  const countEl = document.getElementById("blankCount");
+  const statusEl = document.getElementById("blankStatus");
+
+  btn?.addEventListener("click", async () => {
+    if (!input?.files?.length) return statusEl && (statusEl.textContent = "Choose a PDF.");
+    const at = Math.max(1, parseInt(atEl?.value || "1", 10));
+    const where = whereEl?.value || "before";
+    const count = Math.max(1, parseInt(countEl?.value || "1", 10));
+    statusEl && (statusEl.textContent = "Inserting…");
+    try {
+      const src = await PDFLib.PDFDocument.load(await input.files[0].arrayBuffer());
+      const out = await PDFLib.PDFDocument.create();
+      const pages = await out.copyPages(src, src.getPageIndices());
+      const a4 = [595.28, 841.89];
+
+      const targetIdx = Math.min(src.getPageCount(), Math.max(1, at)) - 1;
+      pages.forEach((p, i) => {
+        if (where === "before" && i === targetIdx) {
+          for (let k = 0; k < count; k++) out.addPage(a4);
+        }
+        out.addPage(p);
+        if (where === "after" && i === targetIdx) {
+          for (let k = 0; k < count; k++) out.addPage(a4);
+        }
+      });
+      await downloadPdf(out, `NiceDay_InsertBlank_${Date.now()}.pdf`, "reorder");
+      statusEl && (statusEl.textContent = "Done.");
+    } catch (e) {
+      console.error(e);
+      statusEl && (statusEl.textContent = "Error inserting.");
+    }
+  });
+})();
+//org Duplicating
+(function () {
+  const btn = document.getElementById("dupBtn");
+  const input = document.getElementById("dupInput");
+  const rangesEl = document.getElementById("dupRanges");
+  const statusEl = document.getElementById("dupStatus");
+
+  btn?.addEventListener("click", async () => {
+    if (!input?.files?.length) return statusEl && (statusEl.textContent = "Choose a PDF.");
+    const ranges = parseRanges(rangesEl?.value);
+    if (!ranges.length) return statusEl && (statusEl.textContent = "Enter valid ranges.");
+    statusEl && (statusEl.textContent = "Duplicating…");
+    try {
+      const src = await PDFLib.PDFDocument.load(await input.files[0].arrayBuffer());
+      const out = await PDFLib.PDFDocument.create();
+      const orig = await out.copyPages(src, src.getPageIndices());
+      orig.forEach(p => out.addPage(p));
+      const total = src.getPageCount();
+      const idxs = [];
+      for (const [a, b] of ranges) {
+        const s = Math.max(1, a), e = Math.min(total, b);
+        for (let i = s; i <= e; i++) idxs.push(i - 1);
+      }
+      const dups = await out.copyPages(src, idxs);
+      dups.forEach(p => out.addPage(p));
+      await downloadPdf(out, `NiceDay_Duplicated_${Date.now()}.pdf`, "reorder");
+      statusEl && (statusEl.textContent = "Done.");
+    } catch (e) {
+      console.error(e);
+      statusEl && (statusEl.textContent = "Error duplicating.");
+    }
+  });
+})();
+
   /* ORGANIZE: Merge PDFs */
   (function () {
     const btn = document.getElementById("mergeBtn");
@@ -1071,6 +1206,132 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   })();
+//org crop
+  (function () {
+  const btn = document.getElementById("cropBtn");
+  const input = document.getElementById("cropInput");
+  const t = document.getElementById("cropTop");
+  const r = document.getElementById("cropRight");
+  const b = document.getElementById("cropBottom");
+  const l = document.getElementById("cropLeft");
+  const statusEl = document.getElementById("cropStatus");
+
+  btn?.addEventListener("click", async () => {
+    if (!input?.files?.length) return statusEl && (statusEl.textContent = "Choose a PDF.");
+    const top = Math.max(0, parseFloat(t?.value || "0"));
+    const right = Math.max(0, parseFloat(r?.value || "0"));
+    const bottom = Math.max(0, parseFloat(b?.value || "0"));
+    const left = Math.max(0, parseFloat(l?.value || "0"));
+    statusEl && (statusEl.textContent = "Cropping…");
+
+    try {
+      const src = await PDFLib.PDFDocument.load(await input.files[0].arrayBuffer());
+      const out = await PDFLib.PDFDocument.create();
+      const pages = await out.copyPages(src, src.getPageIndices());
+      pages.forEach((p) => {
+        const { width, height } = p.getSize();
+        const x = left, y = bottom;
+        const w = Math.max(1, width - left - right);
+        const h = Math.max(1, height - top - bottom);
+        p.setMediaBox(x, y, w, h);
+        out.addPage(p);
+      });
+      await downloadPdf(out, `NiceDay_Cropped_${Date.now()}.pdf`, "reorder");
+      statusEl && (statusEl.textContent = "Done.");
+    } catch (e) {
+      console.error(e);
+      statusEl && (statusEl.textContent = "Error cropping.");
+    }
+  });
+})();
+//org stamp
+(function () {
+  const btn = document.getElementById("stampBtn");
+  const input = document.getElementById("stampInput");
+  const textEl = document.getElementById("stampText");
+  const posEl = document.getElementById("stampPos");
+  const sizeEl = document.getElementById("stampSize");
+  const marginEl = document.getElementById("stampMargin");
+  const statusEl = document.getElementById("stampStatus");
+
+  btn?.addEventListener("click", async () => {
+    if (!input?.files?.length) return statusEl && (statusEl.textContent = "Choose a PDF.");
+    const label = textEl?.value || "Reviewed";
+    const pos = posEl?.value || "br";
+    const size = Math.max(6, parseInt(sizeEl?.value || "10", 10));
+    const margin = Math.max(0, parseInt(marginEl?.value || "16", 10));
+    statusEl && (statusEl.textContent = "Stamping…");
+    try {
+      const src = await PDFLib.PDFDocument.load(await input.files[0].arrayBuffer());
+      const out = await PDFLib.PDFDocument.create();
+      const { font } = await getFontsFor(out);
+      const pages = await out.copyPages(src, src.getPageIndices());
+      pages.forEach((p) => {
+        out.addPage(p);
+        const { width, height } = p.getSize();
+        const tw = font.widthOfTextAtSize(label, size);
+        let x = margin, y = margin;
+        if (pos === "br") { x = width - tw - margin; y = margin; }
+        if (pos === "bc") { x = (width - tw) / 2; y = margin; }
+        if (pos === "tr") { x = width - tw - margin; y = height - size - margin; }
+        if (pos === "tc") { x = (width - tw) / 2; y = height - size - margin; }
+        if (pos === "tl") { x = margin; y = height - size - margin; }
+        p.drawText(label, { x, y, size, font, color: PDFLib.rgb(0.2,0.2,0.2) });
+      });
+      await downloadPdf(out, `NiceDay_Stamped_${Date.now()}.pdf`, "watermark");
+      statusEl && (statusEl.textContent = "Done.");
+    } catch (e) {
+      console.error(e);
+      statusEl && (statusEl.textContent = "Error stamping.");
+    }
+  });
+})();
+
+
+//org sign
+(function () {
+  const btn = document.getElementById("signBtn");
+  const pdfIn = document.getElementById("signPdfInput");
+  const imgIn = document.getElementById("signImgInput");
+  const wEl = document.getElementById("signWidth");
+  const mxEl = document.getElementById("signMarginX");
+  const myEl = document.getElementById("signMarginY");
+  const statusEl = document.getElementById("signStatus");
+
+  btn?.addEventListener("click", async () => {
+    if (!pdfIn?.files?.length || !imgIn?.files?.length) {
+      return statusEl && (statusEl.textContent = "Choose PDF and signature image.");
+    }
+    statusEl && (statusEl.textContent = "Placing signature…");
+    try {
+      const src = await PDFLib.PDFDocument.load(await pdfIn.files[0].arrayBuffer());
+      const out = await PDFLib.PDFDocument.create();
+      const bytes = new Uint8Array(await imgIn.files[0].arrayBuffer());
+      let sig;
+      if ((imgIn.files[0].type || "").includes("png")) sig = await out.embedPng(bytes);
+      else sig = await out.embedJpg(bytes);
+
+      const desiredW = Math.max(30, parseFloat(wEl?.value || "120"));
+      const marginX = Math.max(0, parseFloat(mxEl?.value || "24"));
+      const marginY = Math.max(0, parseFloat(myEl?.value || "24"));
+      const r = desiredW / sig.width;
+      const drawW = desiredW;
+      const drawH = sig.height * r;
+
+      const pages = await out.copyPages(src, src.getPageIndices());
+      pages.forEach((p) => {
+        out.addPage(p);
+        const { width, height } = p.getSize();
+        p.drawImage(sig, { x: width - drawW - marginX, y: marginY, width: drawW, height: drawH });
+      });
+      await downloadPdf(out, `NiceDay_Signed_${Date.now()}.pdf`, "watermark");
+      statusEl && (statusEl.textContent = "Done.");
+    } catch (e) {
+      console.error(e);
+      statusEl && (statusEl.textContent = "Error signing.");
+    }
+  });
+})();
 
   /* SECURE: Strip Metadata */
   (function () {
@@ -1301,3 +1562,5 @@ document.addEventListener("DOMContentLoaded", () => {
   window.__ndTryStart?.();
 });
 
+
+   
