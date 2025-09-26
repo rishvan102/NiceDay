@@ -1,6 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-basepath="NiceDay">
-
+<html lang="en" data-basepath="">
 <head>
   <meta name="google-site-verification" content="_SzuIyy7c3LCRGbdr_dz_VSa1PHScqDJ5yluKUPQ1k4" />
   <meta charset="UTF-8" />
@@ -24,7 +23,7 @@
   <link rel="stylesheet" href="dist/styles.css" />
 
   <style>
-    :root{
+    :root {
       --brand:#ffb703; --brand-2:#fb8500;
       --bg-a:#fff7ea; --bg-b:#fffdf7;
       --ink:#111827; --muted:#6b7280;
@@ -80,12 +79,14 @@
     footer a{ text-decoration:underline; text-underline-offset:2px; }
   </style>
 
-  <!-- Optional subpath helper (used by app.js too if present) -->
+  <!-- Subpath helper -->
   <script>
     (function(){
       const baseAttr = document.documentElement.getAttribute('data-basepath') || "";
       const base = window.__ND_BASE_PATH__ || baseAttr || "";
-      window.__ndPath__ = (p) => (base ? ("/" + base.replace(/^\/|\/$/g,"") + "/" + p.replace(/^\/+/,"")) : "/" + p.replace(/^\/+/,""));
+      window.__ndPath__ = (p) =>
+        (base ? ("/" + base.replace(/^\/|\/$/g,"") + "/" + p.replace(/^\/+/,""))
+              : "/" + p.replace(/^\/+/,""));
     })();
   </script>
 </head>
@@ -370,6 +371,7 @@
     </div>
   </div>
 
+  
   <footer class="max-w-6xl mx-auto px-4 mt-10 pb-12 text-sm">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
       <div>© <span id="yr"></span> Nice Day. All rights reserved.</div>
@@ -386,9 +388,11 @@
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js" crossorigin="anonymous"></script>
 
-  <!-- App (bundles pdf-lib loader, fontkit, worker config, and all handlers) -->
-  <script>window.__ND_BASE_PATH__ = "NiceDay";</script>
-<script src="app.js" defer></script>
+  <!-- App -->
+   <!-- Polyfill for async/await in fontkit -->
+<script src="https://cdn.jsdelivr.net/npm/regenerator-runtime@0.13.11/runtime.min.js"></script>
+
+  <script src="app.js" defer></script>
 </body>
 </html>
 
