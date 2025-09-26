@@ -189,10 +189,15 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Escape") hideMotivator();
   });
 
-  /* ----------------------------- Fonts setup ---------------------------- */
-  let FONT_REG_BYTES = null,
-    FONT_BOLD_BYTES = null,
-    FONT_SYM_BYTES = null;
+  /* ----------------------------- Fonts setup (Tamil-aware, single wrapper) ---------------------------- */
+  const FONT_STATE = {
+    loaded: false,
+    REG: null,
+    BOLD: null,
+    SYM: undefined,   // undefined means "not tried yet"; null means "tried but missing"
+    TA_REG: undefined,
+    TA_BOLD: undefined,
+  };
 
   async function fetchTTF(url) {
     const r = await fetch(url);
@@ -214,23 +219,32 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function preloadFontBytes() {
-    if (FONT_REG_BYTES && FONT_BOLD_BYTES) return;
+    if (FONT_STATE.loaded) return;
     const p = (x) => window.__ndPath__("fonts/" + x);
-    [FONT_REG_BYTES, FONT_BOLD_BYTES] = await Promise.all([
+
+    // Required Latin set
+    [FONT_STATE.REG, FONT_STATE.BOLD] = await Promise.all([
       fetchTTF(p("NotoSans-Regular.ttf")),
       fetchTTF(p("NotoSans-Bold.ttf")),
     ]);
 
-    // Try symbola.ttf first (your earlier naming), then NotoSansSymbols2-Regular.ttf
+    // Optional Tamil set
     try {
-      FONT_SYM_BYTES = await fetchTTF(p("symbola.ttf"));
+      FONT_STATE.TA_REG = await fetchTTF(p("NotoSansTamil-Regular.ttf"));
+    } catch { FONT_STATE.TA_REG = null; }
+    try {
+      FONT_STATE.TA_BOLD = await fetchTTF(p("NotoSansTamil-Bold.ttf"));
+    } catch { FONT_STATE.TA_BOLD = null; }
+
+    // Optional symbols/emoji – try Symbola first, then Noto Symbols2
+    try {
+      FONT_STATE.SYM = await fetchTTF(p("symbola.ttf"));
     } catch {
-      try {
-        FONT_SYM_BYTES = await fetchTTF(p("NotoSansSymbols2-Regular.ttf"));
-      } catch {
-        FONT_SYM_BYTES = null; // fallback to primary if missing
-      }
+      try { FONT_STATE.SYM = await fetchTTF(p("NotoSansSymbols2-Regular.ttf")); }
+      catch { FONT_STATE.SYM = null; }
     }
+
+    FONT_STATE.loaded = true;
   }
 
   async function getFontsFor(pdf) {
@@ -240,46 +254,92 @@ document.addEventListener("DOMContentLoaded", () => {
       pdf.registerFontkit(fk);
       pdf._ndFontkitRegistered = true;
     }
-    // Use subset:false for consistent width measurement across lines.
-    const font = await pdf.embedFont(FONT_REG_BYTES, { subset: false });
-    const fontBold = await pdf.embedFont(FONT_BOLD_BYTES, { subset: false });
-    const fontSym = FONT_SYM_BYTES ? await pdf.embedFont(FONT_SYM_BYTES, { subset: false }) : font;
-    return { font, fontBold, fontSym };
+
+    // subset:false keeps metrics stable for wrapping; pdf-lib still subsets on save
+    const font     = await pdf.embedFont(FONT_STATE.REG,  { subset: false });
+    const fontBold = await pdf.embedFont(FONT_STATE.BOLD, { subset: false });
+
+    const fontTa     = FONT_STATE.TA_REG  ? await pdf.embedFont(FONT_STATE.TA_REG,  { subset: false }) : null;
+    const fontTaBold = FONT_STATE.TA_BOLD ? await pdf.embedFont(FONT_STATE.TA_BOLD, { subset: false })
+                                          : (fontTa || fontBold);
+    const fontSym    = FONT_STATE.SYM     ? await pdf.embedFont(FONT_STATE.SYM,     { subset: false }) : font;
+
+    return { font, fontBold, fontSym, fontTa, fontTaBold };
   }
 
-  // Unicode-aware wrapper that switches to fallback for missing glyphs
-  function drawUnicodeWrapped(page, text, x, y, width, size, leading, primary, fallback, color) {
-    const hasGlyph = (f, cp) => (f.hasGlyphForUnicode ? f.hasGlyphForUnicode(cp) : true);
+  // Tamil block & helpers
+  function isTamil(cp) { return cp >= 0x0B80 && cp <= 0x0BFF; }
+  function isJoiner(cp) { return cp === 0x200C /* ZWNJ */ || cp === 0x200D /* ZWJ */; }
+
+  /**
+   * Unicode-aware wrapper with Tamil run routing.
+   * Keeps an entire Tamil run (including ZWJ/ZWNJ & combining marks) in the Tamil font
+   * so we don't flush on every codepoint and break shaping.
+   *
+   * drawUnicodeWrapped(page, text, x, y, width, size, leading, latinFont, symFont, tamilFont, color)
+   */
+  function drawUnicodeWrapped(page, text, x, y, width, size, leading, latinFont, symFont, tamilFont, color) {
     const chars = Array.from(text || "");
-    let ty = y,
-      line = "",
-      lineFont = primary;
+    let ty = y;
+
+    // current line text + the font that will be used to draw this line
+    let line = "";
+    let lineFont = latinFont;
+
+    // track if we are inside a Tamil run; if true, force tamilFont
+    let inTamilRun = false;
+
+    const hasGlyph = (f, cp) => (f && f.hasGlyphForUnicode ? f.hasGlyphForUnicode(cp) : !!f);
+
+    function pickFont(cp) {
+      if (inTamilRun) return tamilFont || latinFont;
+      if (isTamil(cp) || isJoiner(cp)) {
+        inTamilRun = true;
+        return tamilFont || latinFont;
+      }
+      if (hasGlyph(latinFont, cp)) return latinFont;
+      if (symFont && hasGlyph(symFont, cp)) return symFont;
+      return latinFont;
+    }
 
     function flush() {
       if (!line) return;
       page.drawText(line, { x, y: ty, size, font: lineFont, color });
       ty -= leading;
       line = "";
-      lineFont = primary;
+      inTamilRun = false;
+      lineFont = latinFont;
     }
 
     for (const ch of chars) {
       const cp = ch.codePointAt(0);
-      const f = hasGlyph(primary, cp) ? primary : hasGlyph(fallback, cp) ? fallback : primary;
-      if (!line) lineFont = f;
-      if (f !== lineFont) {
-        flush(); // change font mid-line; flush to keep width accurate
-        lineFont = f;
+      if (ch === "\n") { flush(); continue; }
+
+      const f = pickFont(cp);
+
+      if (inTamilRun && isJoiner(cp)) {
+        line += ch;
+        continue;
       }
+
+      if (!line) lineFont = f;
+      if (f !== lineFont) { flush(); lineFont = f; }
+
       const candidate = line + ch;
       const w = lineFont.widthOfTextAtSize(candidate, size);
-      if (w > width) {
+
+      if (w > width && line) {
         flush();
+        inTamilRun = isTamil(cp) || isJoiner(cp);
+        lineFont = inTamilRun ? (tamilFont || latinFont) : (hasGlyph(latinFont, cp) ? latinFont : (symFont || latinFont));
         line = ch;
       } else {
         line = candidate;
       }
+
+      if (ch === " " || ch === "\t") inTamilRun = false;
     }
+
     if (line) {
       page.drawText(line, { x, y: ty, size, font: lineFont, color });
       ty -= leading;
@@ -287,68 +347,16 @@ document.addEventListener("DOMContentLoaded", () => {
     return ty;
   }
 
-  /* --------------------------- Small utilities -------------------------- */
-  async function fileToBytes(file) {
-    const buf = await file.arrayBuffer();
-    return new Uint8Array(buf);
-  }
-  function copyBytes(u8) {
-    return u8.slice(0);
-  }
-  function saveBlob(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-  async function downloadPdf(pdfDoc, filename, kind) {
-    const bytes = await pdfDoc.save();
-    saveBlob(new Blob([bytes], { type: "application/pdf" }), filename);
-    showMotivator(kind);
-  }
-  function wrapText(page, text, font, size, x, y, width, leading, color) {
-    const words = String(text || "").split(/\s+/);
-    let line = "",
-      ty = y;
-    for (const w of words) {
-      const test = line ? line + " " + w : w;
-      if (font.widthOfTextAtSize(test, size) > width) {
-        if (line) page.drawText(line, { x, y: ty, size, font, color });
-        ty -= leading;
-        line = w;
-      } else line = test;
-    }
-    if (line) page.drawText(line, { x, y: ty, size, font, color });
-    return ty;
-  }
-  function parseRanges(text) {
-    const parts = String(text || "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const out = [];
-    for (const p of parts) {
-      if (p.includes("-")) {
-        let [a, b] = p.split("-").map((n) => parseInt(n, 10));
-        if (!isNaN(a) && !isNaN(b)) out.push([a, b]);
-      } else {
-        let n = parseInt(p, 10);
-        if (!isNaN(n)) out.push([n, n]);
-      }
-    }
-    return out;
-  }
+  /* ----------------------- ==== PDF tool handlers (Tamil-aware) ==== ----------------------- */
 
-  /* ----------------------- ==== PDF tool handlers ==== ----------------------- */
-
-  /* DOCS: Note → PDF (Unicode-safe) */
+  /* DOCS: Note → PDF (Unicode-safe, Tamil supported) */
   (function () {
     const noteBtn = document.getElementById("noteBtn");
     const noteInput = document.getElementById("noteInput");
     const noteTitle = document.getElementById("noteTitle");
     const noteStatus = document.getElementById("noteStatus");
+
+    const hasTamil = (s) => /[\u0B80-\u0BFF]/.test(String(s || ""));
 
     noteBtn?.addEventListener("click", async () => {
       if (!noteInput) return;
@@ -360,18 +368,21 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       try {
         const pdf = await PDFLib.PDFDocument.create();
-        const { font, fontBold, fontSym } = await getFontsFor(pdf);
+        const { font, fontBold, fontSym, fontTa, fontTaBold } = await getFontsFor(pdf);
+
         let page = pdf.addPage([595.28, 841.89]);
-        const margin = 50,
-          width = page.getSize().width - margin * 2;
+        const margin = 50;
+        const width = page.getSize().width - margin * 2;
         let y = page.getSize().height - margin - 20;
 
         const title = noteTitle?.value || "My Note";
+        const titleFont = hasTamil(title) && (fontTaBold || fontTa) ? (fontTaBold || fontTa) : fontBold;
+
         page.drawText(title, {
           x: margin,
           y,
           size: 18,
-          font: fontBold,
+          font: titleFont,
           color: PDFLib.rgb(0.1, 0.1, 0.1),
         });
         y -= 28;
@@ -389,6 +400,7 @@ document.addEventListener("DOMContentLoaded", () => {
             16,
             font,
             fontSym,
+            fontTa,
             PDFLib.rgb(0.2, 0.2, 0.2)
           );
           y = ty - 18;
@@ -406,7 +418,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   })();
 
-  /* DOCS: Text/Markdown files → PDF (Unicode-safe) */
+  /* DOCS: Text/Markdown files → PDF (Unicode-safe, Tamil supported) */
   (function () {
     const btn = document.getElementById("txtFilesBtn");
     const input = document.getElementById("txtFilesInput");
@@ -419,12 +431,13 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       try {
         const pdf = await PDFLib.PDFDocument.create();
-        const { font, fontBold, fontSym } = await getFontsFor(pdf);
+        const { font, fontBold, fontSym, fontTa } = await getFontsFor(pdf);
+
         for (const f of input.files) {
           const text = await f.text();
           let page = pdf.addPage([595.28, 841.89]);
-          const margin = 50,
-            width = page.getSize().width - margin * 2;
+          const margin = 50;
+          const width = page.getSize().width - margin * 2;
           let y = page.getSize().height - margin - 20;
 
           page.drawText(f.name, {
@@ -438,7 +451,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
           const blocks = text.split(/\n{2,}/);
           for (const b of blocks) {
-            const body = b.replace(/^#.*$/gm, "").replace(/\*\*(.*?)\*\*/g, "$1").split(/\n/).join(" ");
+            const body = b
+              .replace(/^#.*$/gm, "")
+              .replace(/\*\*(.*?)\*\*/g, "$1")
+              .split(/\n/).join(" ");
             let ty = drawUnicodeWrapped(
               page,
               body,
@@ -449,6 +465,7 @@ document.addEventListener("DOMContentLoaded", () => {
               16,
               font,
               fontSym,
+              fontTa,
               PDFLib.rgb(0.2, 0.2, 0.2)
             );
             y = ty - 18;
@@ -467,7 +484,38 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   })();
 
-  /* CONVERT: Images → PDF */
+  /* ---------- Image helpers (adds WebP → PNG/JPEG conversion via <canvas>) ---------- */
+  async function webpToRaster(bytes, mimeOut = "image/png", quality = 0.92) {
+    return new Promise((resolve, reject) => {
+      const blob = new Blob([bytes], { type: "image/webp" });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0);
+          canvas.toBlob((b) => {
+            URL.revokeObjectURL(url);
+            if (!b) return reject(new Error("WebP convert failed"));
+            b.arrayBuffer().then((ab) => resolve(new Uint8Array(ab)));
+          }, mimeOut, quality);
+        } catch (err) {
+          URL.revokeObjectURL(url);
+          reject(err);
+        }
+      };
+      img.onerror = (e) => {
+        URL.revokeObjectURL(url);
+        reject(new Error("Image load failed"));
+      };
+      img.src = url;
+    });
+  }
+
+  /* CONVERT: Images → PDF (now supports PNG/JPEG/WebP) */
   (function () {
     const btn = document.getElementById("imgBtn");
     const input = document.getElementById("imgInput");
@@ -480,18 +528,33 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       try {
         const out = await PDFLib.PDFDocument.create();
+
         for (const f of input.files) {
-          const bytes = await f.arrayBuffer();
-          const isPng = (f.type || "").toLowerCase().includes("png");
-          const img = isPng ? await out.embedPng(bytes) : await out.embedJpg(bytes);
+          const type = (f.type || "").toLowerCase();
+          let bytes = new Uint8Array(await f.arrayBuffer());
+          let img;
+
+          if (type.includes("png")) {
+            img = await out.embedPng(bytes);
+          } else if (type.includes("jpeg") || type.includes("jpg")) {
+            img = await out.embedJpg(bytes);
+          } else if (type.includes("webp")) {
+            // Convert WebP → PNG, then embed
+            const pngBytes = await webpToRaster(bytes, "image/png");
+            img = await out.embedPng(pngBytes);
+          } else {
+            throw new Error(`Unsupported image format: ${f.name} (${type || "unknown"})`);
+          }
+
           const page = out.addPage([595.28, 841.89]);
-          const maxW = 595.28 - 60,
-            maxH = 841.89 - 60;
+          const maxW = 595.28 - 60;
+          const maxH = 841.89 - 60;
           const r = Math.min(maxW / img.width, maxH / img.height);
-          const w = img.width * r,
-            h = img.height * r;
+          const w = img.width * r;
+          const h = img.height * r;
           page.drawImage(img, { x: (595.28 - w) / 2, y: (841.89 - h) / 2, width: w, height: h });
         }
+
         await downloadPdf(out, `NiceDay_Images_${Date.now()}.pdf`, "images");
         statusEl && (statusEl.textContent = "Done.");
       } catch (e) {
@@ -591,8 +654,7 @@ document.addEventListener("DOMContentLoaded", () => {
             bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
             img = await out.embedJpg(bytes);
           }
-          const pw = img.width,
-            ph = img.height;
+          const pw = img.width, ph = img.height;
           const pageOut = out.addPage([pw, ph]);
           pageOut.drawImage(img, { x: 0, y: 0, width: pw, height: ph });
         }
@@ -656,8 +718,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const src = await PDFLib.PDFDocument.load(bytes);
         const total = src.getPageCount();
         for (const [a, b] of ranges) {
-          const start = Math.max(1, a),
-            end = Math.min(total, b);
+          const start = Math.max(1, a), end = Math.min(total, b);
           const out = await PDFLib.PDFDocument.create();
           const idxs = Array.from({ length: end - start + 1 }, (_, i) => start - 1 + i);
           const pages = await out.copyPages(src, idxs);
@@ -781,8 +842,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const delRanges = parseRanges(listEl?.value);
         const toDel = new Set();
         for (const [a, b] of delRanges) {
-          const s = Math.max(1, a),
-            e = Math.min(total, b);
+          const s = Math.max(1, a), e = Math.min(total, b);
           for (let i = s; i <= e; i++) toDel.add(i - 1);
         }
         const out = await PDFLib.PDFDocument.create();
@@ -822,14 +882,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const out = await PDFLib.PDFDocument.create();
         const idxs = [];
         for (const [a, b] of ranges) {
-          const s = Math.max(1, a),
-            e = Math.min(total, b);
+          const s = Math.max(1, a), e = Math.min(total, b);
           for (let i = s; i <= e; i++) idxs.push(i - 1);
         }
         const pages = await out.copyPages(src, idxs);
         pages.forEach((p) => out.addPage(p));
-        await downloadPdf(out, `NiceDay_Extract_${Date.now()}.pdf`, "extract");
-        statusEl && (statusEl.textContent = "Done.");
+        await downloadPdf(out, `NiceDay_Extract_${Date.Now()}.pdf`, "extract");
       } catch (e) {
         console.error(e);
         statusEl && (statusEl.textContent = "Error extracting.");
@@ -863,8 +921,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const total = src.getPageCount();
         const targets = new Set();
         for (const [a, b] of ranges) {
-          const s = Math.max(1, a),
-            e = Math.min(total, b);
+          const s = Math.max(1, a), e = Math.min(total, b);
           for (let i = s; i <= e; i++) targets.add(i - 1);
         }
         const pages = await out.copyPages(src, src.getPageIndices());
@@ -908,33 +965,13 @@ document.addEventListener("DOMContentLoaded", () => {
           const { width, height } = p.getSize();
           const text = `${i + 1} / ${pages.length}`;
           const tw = font.widthOfTextAtSize(text, size);
-          let x = 0,
-            y = 0,
-            m = margin;
-          if (pos === "br") {
-            x = width - tw - m;
-            y = m;
-          }
-          if (pos === "bc") {
-            x = (width - tw) / 2;
-            y = m;
-          }
-          if (pos === "bl") {
-            x = m;
-            y = m;
-          }
-          if (pos === "tr") {
-            x = width - tw - m;
-            y = height - size - m;
-          }
-          if (pos === "tc") {
-            x = (width - tw) / 2;
-            y = height - size - m;
-          }
-          if (pos === "tl") {
-            x = m;
-            y = height - size - m;
-          }
+          let x = 0, y = 0, m = margin;
+          if (pos === "br") { x = width - tw - m; y = m; }
+          if (pos === "bc") { x = (width - tw) / 2; y = m; }
+          if (pos === "bl") { x = m; y = m; }
+          if (pos === "tr") { x = width - tw - m; y = height - size - m; }
+          if (pos === "tc") { x = (width - tw) / 2; y = height - size - m; }
+          if (pos === "tl") { x = m; y = height - size - m; }
           p.drawText(text, { x, y, size, font });
         });
         await downloadPdf(out, `NiceDay_Numbered_${Date.now()}.pdf`, "numbers");
@@ -1031,8 +1068,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const rInfo = document.getElementById("redInfo");
     const rStatus = document.getElementById("redStatus");
 
-    let rPdf = null,
-      rPage = 1;
+    let rPdf = null, rPage = 1;
     const rectsByPage = [];
     const renderState = Object.create(null);
 
@@ -1085,9 +1121,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Draw rectangles with mouse
     (function enableRectDrawing() {
       if (!rCanvas) return;
-      let start = null,
-        current = null,
-        drawing = false;
+      let start = null, current = null, drawing = false;
       rCanvas.addEventListener("mousedown", (e) => {
         if (!rPdf) return;
         const rect = rCanvas.getBoundingClientRect();
@@ -1102,9 +1136,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const ctx = rCanvas.getContext("2d");
         ctx.fillStyle = "rgba(0,0,0,0.45)";
         const x = Math.min(start.x, current.x),
-          y = Math.min(start.y, current.y);
+              y = Math.min(start.y, current.y);
         const w = Math.abs(start.x - current.x),
-          h = Math.abs(start.y - current.y);
+              h = Math.abs(start.y - current.y);
         ctx.fillRect(x, y, w, h);
       });
       window.addEventListener("mouseup", () => {
@@ -1112,9 +1146,9 @@ document.addEventListener("DOMContentLoaded", () => {
         drawing = false;
         if (!start || !current) return;
         const x = Math.min(start.x, current.x),
-          y = Math.min(start.y, current.y);
+              y = Math.min(start.y, current.y);
         const w = Math.abs(start.x - current.x),
-          h = Math.abs(start.y - current.y);
+              h = Math.abs(start.y - current.y);
         if (!rectsByPage[rPage]) rectsByPage[rPage] = [];
         rectsByPage[rPage].push({ x, y, w, h });
         drawCurrentPage();
@@ -1129,7 +1163,7 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         rStatus && (rStatus.textContent = "Applying…");
         const src = await PDFLib.PDFDocument.load(rCanvas._ndOriginalBytes.slice(0), {
-                    ignoreEncryption: true
+          ignoreEncryption: true
         });
         const out = await PDFLib.PDFDocument.create();
         const idxs = src.getPageIndices();
@@ -1164,18 +1198,64 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
 
-        const bytes = await out.save();
-        saveBlob(new Blob([bytes], { type: "application/pdf" }), `NiceDay_Redacted_${Date.now()}.pdf`);
+                const bytes = await out.save();
+        saveBlob(
+          new Blob([bytes], { type: "application/pdf" }),
+          `NiceDay_Redacted_${Date.now()}.pdf`
+        );
         rStatus && (rStatus.textContent = "Done.");
         showMotivator("redact");
-      } catch (err) {
-        console.error("Redact apply error:", err);
+      } catch (e) {
+        console.error(e);
         rStatus && (rStatus.textContent = "Error applying redactions.");
       }
     });
   })();
 
+    /* -------------------- Shared helpers (download, ranges, etc.) -------------------- */
+
+  function saveBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  async function downloadPdf(pdfDoc, filename, kind) {
+    const bytes = await pdfDoc.save();
+    saveBlob(new Blob([bytes], { type: "application/pdf" }), filename);
+    if (typeof showMotivator === "function") showMotivator(kind);
+  }
+
+  // Parse "1-3,5,9-10" -> [[1,3],[5,5],[9,10]]
+  function parseRanges(input) {
+    const src = String(input || "").trim();
+    if (!src) return [];
+    const out = [];
+    for (const part of src.split(",").map((s) => s.trim()).filter(Boolean)) {
+      const m = part.match(/^(\d+)(?:-(\d+))?$/);
+      if (!m) continue;
+      const a = parseInt(m[1], 10);
+      const b = m[2] ? parseInt(m[2], 10) : a;
+      if (Number.isFinite(a) && Number.isFinite(b)) {
+        out.push([Math.min(a, b), Math.max(a, b)]);
+      }
+    }
+    return out;
+  }
+
+  function fileToBytes(file) {
+    return file.arrayBuffer().then((ab) => new Uint8Array(ab));
+  }
+
+  function copyBytes(bytes) {
+    return new Uint8Array(bytes);
+  }
+
   /* ------------------------- kick off if ready -------------------------- */
   window.__ndTryStart?.();
 });
-
