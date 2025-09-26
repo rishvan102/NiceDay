@@ -734,94 +734,135 @@ document.addEventListener("DOMContentLoaded", () => {
   })();
 
   /* ORGANIZE: Reorder Pages (Drag & Drop) */
-  (function () {
-    const input = document.getElementById("reorderDnDInput");
-    const grid = document.getElementById("reorderGrid");
-    const btnReset = document.getElementById("reorderReset");
-    const btnExport = document.getElementById("reorderExport");
-    const statusEl = document.getElementById("reorderDnDStatus");
+  /* ORGANIZE: Reorder Pages (Drag & Drop) */
+(function () {
+  const input = document.getElementById("reorderDnDInput");
+  const grid = document.getElementById("reorderGrid");
+  const btnReset = document.getElementById("reorderReset");
+  const btnExport = document.getElementById("reorderExport");
+  const statusEl = document.getElementById("reorderDnDStatus");
 
-    const reorderState = { order: [], originalBytes: null, pageCount: 0 };
+  const reorderState = { order: [], originalBytes: null, pageCount: 0 };
+  let sortable = null;                // <-- keep a handle so we can destroy/recreate
+  let loadToken = 0;                  // <-- cancel stale async work when a new file loads
 
-    input?.addEventListener("change", async () => {
-      if (!grid) return;
-      grid.innerHTML = "";
-      statusEl && (statusEl.textContent = "");
-      const file = input.files?.[0];
-      if (!file) return;
+  function setStatus(msg) {
+    if (statusEl) statusEl.textContent = msg || "";
+  }
 
-      reorderState.originalBytes = await fileToBytes(file);
-      const pdf = await pdfjsLib.getDocument({ data: copyBytes(reorderState.originalBytes) }).promise;
+  async function renderThumbnails(pdf) {
+    // sequential thumbnail rendering (avoids races)
+    grid.innerHTML = "";
+    for (let n = 1; n <= pdf.numPages; n++) {
+      const page = await pdf.getPage(n);
+      const viewport = page.getViewport({ scale: 0.2 });
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      const item = document.createElement("div");
+      item.className = "border rounded-lg p-1 text-center select-none bg-white";
+      item.dataset.page = n;
+
+      const img = document.createElement("img");
+      img.src = canvas.toDataURL("image/png");
+      img.alt = `Page ${n} thumbnail`;
+      img.className = "thumb w-full rounded";
+
+      const label = document.createElement("div");
+      label.className = "text-xs mt-1 text-gray-600";
+      label.textContent = `Page ${n}`;
+
+      item.appendChild(img);
+      item.appendChild(label);
+      grid.appendChild(item);
+    }
+  }
+
+  input?.addEventListener("change", async () => {
+    if (!grid) return;
+    setStatus("");
+    const file = input.files?.[0];
+    // Allow choosing the same file again later
+    // (do this at the end too in case you want to immediately re-use it)
+    const resetInputValueSoon = () => setTimeout(() => { try { input.value = ""; } catch {} }, 0);
+
+    if (!file) { resetInputValueSoon(); return; }
+
+    // If a Sortable instance already exists, destroy it cleanly
+    if (sortable) { try { sortable.destroy(); } catch {} sortable = null; }
+
+    const myToken = ++loadToken;       // cancel guard for stale async
+    grid.innerHTML = "";
+    setStatus("Loading…");
+
+    try {
+      reorderState.originalBytes = await file.arrayBuffer().then(b => new Uint8Array(b));
+      const pdf = await pdfjsLib.getDocument({ data: reorderState.originalBytes.slice(0) }).promise;
+
+      // If another file started loading meanwhile, abort this one
+      if (myToken !== loadToken) return;
+
       reorderState.pageCount = pdf.numPages;
       reorderState.order = Array.from({ length: pdf.numPages }, (_, i) => i + 1);
 
-      for (let n = 1; n <= pdf.numPages; n++) {
-        const page = await pdf.getPage(n);
-        const viewport = page.getViewport({ scale: 0.2 });
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        await page.render({ canvasContext: ctx, viewport }).promise;
+      await renderThumbnails(pdf);
+      if (myToken !== loadToken) return;
 
-        const item = document.createElement("div");
-        item.className = "border rounded-lg p-1 text-center select-none bg-white";
-        item.dataset.page = n;
-
-        const img = document.createElement("img");
-        img.src = canvas.toDataURL("image/png");
-        img.alt = `Page ${n} thumbnail`;
-        img.className = "thumb w-full rounded";
-        const label = document.createElement("div");
-        label.className = "text-xs mt-1 text-gray-600";
-        label.textContent = `Page ${n}`;
-
-        item.appendChild(img);
-        item.appendChild(label);
-        grid.appendChild(item);
-      }
-
-      new Sortable(grid, {
+      // Recreate Sortable each time
+      sortable = new Sortable(grid, {
         animation: 150,
         ghostClass: "drag-ghost",
         onSort: () => {
           reorderState.order = Array.from(grid.children).map((n) => parseInt(n.dataset.page, 10));
         },
       });
-    });
 
-    btnReset?.addEventListener("click", () => {
-      if (!reorderState.pageCount || !grid) return;
-      const items = Array.from(grid.children).sort(
-        (a, b) => parseInt(a.dataset.page) - parseInt(b.dataset.page)
-      );
-      items.forEach((i) => grid.appendChild(i));
-      reorderState.order = Array.from({ length: reorderState.pageCount }, (_, i) => i + 1);
-    });
+      setStatus("");
+    } catch (err) {
+      console.error(err);
+      setStatus("Could not load PDF.");
+    } finally {
+      resetInputValueSoon();
+    }
+  });
 
-    btnExport?.addEventListener("click", async () => {
-      if (!reorderState.originalBytes) {
-        statusEl && (statusEl.textContent = "Upload a PDF first.");
-        return;
-      }
-      try {
-        const src = await PDFLib.PDFDocument.load(copyBytes(reorderState.originalBytes));
-        const out = await PDFLib.PDFDocument.create();
-        const total = src.getPageCount();
-        const order = reorderState.order.length
-          ? reorderState.order
-          : Array.from({ length: total }, (_, i) => i + 1);
-        const zeroIdx = order.map((n) => Math.min(total, Math.max(1, n)) - 1);
-        const pages = await out.copyPages(src, zeroIdx);
-        pages.forEach((p) => out.addPage(p));
-        await downloadPdf(out, `NiceDay_Reordered_${Date.now()}.pdf`, "reorder");
-        statusEl && (statusEl.textContent = "Done.");
-      } catch (err) {
-        console.error(err);
-        statusEl && (statusEl.textContent = "Error exporting.");
-      }
-    });
-  })();
+  btnReset?.addEventListener("click", () => {
+    if (!reorderState.pageCount || !grid) return;
+    const items = Array.from(grid.children).sort(
+      (a, b) => parseInt(a.dataset.page, 10) - parseInt(b.dataset.page, 10)
+    );
+    items.forEach((i) => grid.appendChild(i));
+    reorderState.order = Array.from({ length: reorderState.pageCount }, (_, i) => i + 1);
+  });
+
+  btnExport?.addEventListener("click", async () => {
+    if (!reorderState.originalBytes) {
+      setStatus("Upload a PDF first.");
+      return;
+    }
+    try {
+      setStatus("Exporting…");
+      const src = await PDFLib.PDFDocument.load(reorderState.originalBytes.slice(0));
+      const out = await PDFLib.PDFDocument.create();
+      const total = src.getPageCount();
+      const order = reorderState.order.length
+        ? reorderState.order
+        : Array.from({ length: total }, (_, i) => i + 1);
+      const zeroIdx = order.map((n) => Math.min(total, Math.max(1, n)) - 1);
+      const pages = await out.copyPages(src, zeroIdx);
+      pages.forEach((p) => out.addPage(p));
+      await downloadPdf(out, `NiceDay_Reordered_${Date.now()}.pdf`, "reorder");
+      setStatus("Done.");
+    } catch (err) {
+      console.error(err);
+      setStatus("Error exporting.");
+    }
+  });
+})();
+
 
   /* EDIT: Delete Pages */
   (function () {
@@ -1259,3 +1300,4 @@ document.addEventListener("DOMContentLoaded", () => {
   /* ------------------------- kick off if ready -------------------------- */
   window.__ndTryStart?.();
 });
+
