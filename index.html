@@ -79,6 +79,97 @@
 
     footer{ color:var(--muted); }
     footer a{ text-decoration:underline; text-underline-offset:2px; }
+
+     /* --- Layout fixes: equal-height cards & tidier grids --- */
+.grid-tools{
+  display:grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.25rem;
+  align-items: stretch;              /* makes rows line up */
+}
+
+.tool-card{
+  display:flex;
+  flex-direction:column;
+  height:100%;
+}
+
+.tool-card > *:last-child{
+  margin-top:auto;                   /* push the status/cta block down */
+}
+
+/* unifies input heights so rows align */
+.tool-card input[type="text"],
+.tool-card input[type="number"],
+.tool-card input[type="file"],
+.tool-card select,
+.tool-card button{
+  min-height: 2.5rem;                /* ~ h-10 */
+}
+
+/* wider container + comfy gutters */
+.container-wide{ max-width: 80rem; margin-inline:auto; padding-inline:1rem }
+@media (min-width:1024px){ .container-wide{ padding-inline:1.5rem } }
+
+/* Make all tool-cards equal height and push button to bottom */
+.tool-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* pushes footer button to bottom */
+  min-height: 260px; /* adjust to match your tallest card */
+}
+.tool-card button {
+  margin-top: auto; /* ensures buttons always sit at bottom */
+}
+.grid-tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem; /* spacing between cards */
+  align-items: stretch; /* ensures equal height */
+}
+/* --- Card layout & button alignment --- */
+.grid-tools{
+  align-items: stretch;           /* make every card in the row equal height */
+}
+
+.tool-card{
+  display: flex;                  /* vertical stack */
+  flex-direction: column;
+  justify-content: flex-start;
+  min-height: 380px;              /* tune as you like (360–420) */
+}
+
+/* push the primary action button to the bottom of every card */
+.tool-card [id$="Btn"],
+.tool-card #reorderExport,
+.tool-card #redApply{
+  margin-top: auto;               /* sits at the bottom of the card */
+}
+
+/* keep the little "status" line under the button a consistent height */
+.tool-card [id$="Status"]{
+  min-height: 1.25rem;            /* ~20px, prevents card height wobble */
+  margin-top: .5rem;
+}
+
+/* Optional: nicer look/feel */
+.tool-card{
+  background: rgba(255,255,255,.82);
+  backdrop-filter: blur(6px);
+  border-radius: 1rem;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.tool-card:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(0,0,0,.08);
+}
+
+/* Redact canvas: ensure it shrinks on small screens but still lets the card stretch */
+#redactStage{
+  width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+}
   </style>
 
   <!-- Subpath helper -->
@@ -397,6 +488,7 @@
   <script src="app.js" defer></script>
 </body>
 </html>
+
 
 
 
