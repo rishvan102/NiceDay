@@ -40,17 +40,30 @@
         radial-gradient(1200px 600px at 80% 110%, var(--bg-a), transparent),
         linear-gradient(180deg, var(--bg-b), #ffffff);
       min-height:100dvh;
+      display:flex;flex-direction:column;
     }
 
     /* Pills / cards / tabs */
     .pill{background:linear-gradient(90deg,#ffd166,var(--brand))}
-    .tool-card{transition:transform .15s ease, box-shadow .15s ease; background:rgba(255,255,255,.82); backdrop-filter:blur(6px)}
-    .tool-card:hover{transform:translateY(-2px); box-shadow:0 12px 30px rgba(0,0,0,.08)}
     .tab{border:1px solid #fde68a; background:#fffbea; padding:.5rem .85rem; border-radius:999px; white-space:nowrap}
     .tab.active{background:#ffedd5; border-color:#fdba74}
     .tool-title{display:flex; align-items:center; gap:.5rem}
     .tool-title .emoji{font-size:1.15rem}
     .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+    /* Top controls (tabs + search) */
+    .controls{max-width:72rem;margin:1rem auto 0;padding:0 1rem}
+    .controls .tabs{
+      display:flex;gap:.5rem;flex-wrap:wrap; /* show ALL tabs, wrap on small screens */
+      align-items:center;margin-bottom:.75rem;
+    }
+    .controls .search-row{display:flex;gap:.75rem;align-items:center}
+    .controls .search{position:relative;flex:1;max-width:720px}
+    .controls .search input{
+      width:100%;border:1px solid #e5e7eb;border-radius:12px;padding:.6rem 1rem .6rem 2.2rem;background:#fff;
+    }
+    .controls .search span{position:absolute;left:.75rem;top:.55rem;color:#9ca3af}
+    .controls .tip{font-size:.8rem;color:#6b7280}
 
     /* Grid + equal heights + bottom-aligned CTAs */
     .grid-tools{
@@ -63,7 +76,10 @@
       display:flex; flex-direction:column; justify-content:flex-start;
       border:1px solid #f3f4f6; border-radius:1rem; padding:1.25rem;
       min-height:360px;
+      transition:transform .15s ease, box-shadow .15s ease; background:rgba(255,255,255,.82); backdrop-filter:blur(6px);
+      scroll-margin-top:140px; /* prevents hiding under controls when scrolled into view */
     }
+    .tool-card:hover{transform:translateY(-2px); box-shadow:0 12px 30px rgba(0,0,0,.08)}
     .tool-card > *:last-child{margin-top:auto}
     .tool-card button{margin-top:auto; min-height:2.5rem}
     .tool-card [id$="Status"]{min-height:1.25rem; margin-top:.5rem; font-size:.75rem; color:#6b7280}
@@ -144,28 +160,27 @@
     </div>
   </header>
 
-  <!-- Search -->
-  <div class="max-w-6xl mx-auto px-4 mt-6 mb-4 flex flex-col md:flex-row md:items-center gap-3">
-    <div class="relative flex-1">
-      <label for="toolSearch" class="sr-only">Search tools</label>
-      <input id="toolSearch" type="search" inputmode="search" placeholder="Search tools (e.g., write, merge, rotate, watermark)…" class="w-full border rounded-xl px-4 py-2 pl-10" />
-      <span class="absolute left-3 top-2.5 text-gray-400" aria-hidden="true">🔎</span>
-    </div>
-  </div>
-
-  <!-- Tabs -->
-  <div class="max-w-6xl mx-auto px-4" id="main">
-    <div class="flex gap-2 mb-4 overflow-x-auto">
+  <!-- Tabs + Search (moved above tools; all tabs visible) -->
+  <div class="controls">
+    <div class="tabs" id="tabs">
       <button class="tab active" data-tab="docs" aria-pressed="true">Docs</button>
       <button class="tab" data-tab="convert" aria-pressed="false">Convert</button>
       <button class="tab" data-tab="organize" aria-pressed="false">Organize</button>
       <button class="tab" data-tab="edit" aria-pressed="false">Edit</button>
       <button class="tab" data-tab="secure" aria-pressed="false">Secure</button>
-      <div class="ml-auto text-xs text-gray-500 hidden sm:flex items-center gap-2">
-        <span>Tip: use the search box to find tools fast</span>
-      </div>
     </div>
+    <div class="search-row">
+      <div class="search">
+        <label for="toolSearch" class="sr-only">Search tools</label>
+        <input id="toolSearch" type="search" inputmode="search" placeholder="Search tools (e.g., write, merge, rotate, watermark)…" />
+        <span aria-hidden="true">🔎</span>
+      </div>
+      <div class="tip hidden md:block">Tip: type to quickly filter tools</div>
+    </div>
+  </div>
 
+  <!-- Main -->
+  <div class="max-w-6xl mx-auto px-4" id="main">
     <!-- === DOCS === -->
     <section class="tabpanel" data-tabpanel="docs" role="region" aria-label="Docs">
       <div class="grid-tools">
@@ -312,8 +327,6 @@
           <p id="reorderDnDStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
         </div>
 
-        
-
         <!-- Duplicate pages -->
         <div class="tool-card rounded-2xl border p-5" data-tags="organize duplicate copy pages">
           <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">📚</span> Duplicate Pages</h3>
@@ -429,71 +442,30 @@
           <p id="stampStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
         </div>
 
+        <!-- Signature (compact) -->
         <div class="tool-card rounded-2xl border p-5 compact" data-tags="edit sign signature image">
-  <h3 class="tool-title font-semibold text-lg mb-2">
-    <span class="emoji" aria-hidden="true">✍️</span> Add Signature (PNG)
-  </h3>
-  <p class="text-sm text-gray-600 mb-3">
-    Place a transparent PNG signature on all pages (bottom-right by default).
-  </p>
-
-  <!-- Step 1: PDF -->
-  <div class="mb-2">
-    <label for="signPdfInput" class="block text-sm font-semibold text-gray-700">
-      1) Choose PDF
-    </label>
-    <p class="text-xs text-gray-500 mb-1">The document you want to sign.</p>
-    <input id="signPdfInput"
-           type="file"
-           accept="application/pdf"
-           class="block w-full text-sm"
-           aria-describedby="signPdfHelp"
-           aria-label="Choose PDF to sign" />
-    <span id="signPdfHelp" class="sr-only">Choose the PDF file to sign</span>
-  </div>
-
-  <!-- Step 2: Signature image -->
-  <div class="mb-2">
-    <label for="signImgInput" class="block text-sm font-semibold text-gray-700">
-      2) Signature image (PNG)
-    </label>
-    <p class="text-xs text-gray-500 mb-1">
-      Use a PNG with transparent background for best results.
-    </p>
-    <input id="signImgInput"
-           type="file"
-           accept="image/png,image/jpeg"
-           class="block w-full text-sm"
-           aria-describedby="signImgHelp"
-           aria-label="Choose signature image" />
-    <span id="signImgHelp" class="sr-only">Choose your signature image</span>
-  </div>
-
-  <!-- Size & margins -->
-  <div class="grid grid-cols-3 gap-2 mt-2">
-    <div>
-      <label for="signWidth" class="block text-xs font-medium text-gray-600 mb-1">Width (px)</label>
-      <input id="signWidth" type="number" value="120" class="border rounded-lg px-3 py-2 text-sm w-full" />
-    </div>
-    <div>
-      <label for="signMarginX" class="block text-xs font-medium text-gray-600 mb-1">Margin X</label>
-      <input id="signMarginX" type="number" value="24" class="border rounded-lg px-3 py-2 text-sm w-full" />
-    </div>
-    <div>
-      <label for="signMarginY" class="block text-xs font-medium text-gray-600 mb-1">Margin Y</label>
-      <input id="signMarginY" type="number" value="24" class="border rounded-lg px-3 py-2 text-sm w-full" />
-    </div>
-  </div>
-  <p class="text-xs text-gray-500 mt-1">
-    Width(px) • Margin X/Y (from bottom-right).
-  </p>
-
-  <button id="signBtn" class="mt-3 w-full bg-black text-white rounded-lg py-2">
-    Sign & Download
-  </button>
-  <p id="signStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
-</div>
-
+          <h3 class="tool-title font-semibold text-lg mb-2"><span class="emoji" aria-hidden="true">✍️</span> Add Signature (PNG)</h3>
+          <p class="text-sm text-gray-600 mb-3">Place a transparent PNG signature on all pages (bottom-right by default).</p>
+          <div class="mb-2">
+            <label for="signPdfInput" class="block text-sm font-semibold text-gray-700">1) Choose PDF</label>
+            <p class="text-xs text-gray-500 mb-1">The document you want to sign.</p>
+            <input id="signPdfInput" type="file" accept="application/pdf" class="block w-full text-sm" aria-label="Choose PDF to sign" />
+          </div>
+          <div class="mb-2">
+            <label for="signImgInput" class="block text-sm font-semibold text-gray-700">2) Signature image (PNG)</label>
+            <p class="text-xs text-gray-500 mb-1">Use a PNG with transparent background for best results.</p>
+            <input id="signImgInput" type="file" accept="image/png,image/jpeg" class="block w-full text-sm" aria-label="Choose signature image" />
+          </div>
+          <div class="grid grid-cols-3 gap-2 mt-2">
+            <div><label for="signWidth" class="block text-xs font-medium text-gray-600 mb-1">Width (px)</label><input id="signWidth" type="number" value="120" class="border rounded-lg px-3 py-2 text-sm w-full" /></div>
+            <div><label for="signMarginX" class="block text-xs font-medium text-gray-600 mb-1">Margin X</label><input id="signMarginX" type="number" value="24" class="border rounded-lg px-3 py-2 text-sm w-full" /></div>
+            <div><label for="signMarginY" class="block text-xs font-medium text-gray-600 mb-1">Margin Y</label><input id="signMarginY" type="number" value="24" class="border rounded-lg px-3 py-2 text-sm w-full" /></div>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">Width(px) • Margin X/Y (from bottom-right).</p>
+          <button id="signBtn" class="mt-3 w-full bg-black text-white rounded-lg py-2">Sign & Download</button>
+          <p id="signStatus" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
+        </div>
+      </div>
     </section>
 
     <!-- === SECURE === -->
@@ -566,8 +538,39 @@
   <!-- App -->
   <script src="app.js" defer></script>
 
-  <!-- Service Worker (subpath-aware) -->
+  <!-- UI & SW wiring -->
   <script>
+    // Year
+    document.getElementById('yr').textContent = new Date().getFullYear();
+
+    // Tabs
+    function activateTab(name){
+      document.querySelectorAll('.tab').forEach(t=>{
+        const on = t.dataset.tab===name;
+        t.classList.toggle('active', on);
+        t.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      document.querySelectorAll('.tabpanel').forEach(p=>{
+        const on = p.dataset.tabpanel===name;
+        p.classList.toggle('hidden', !on);
+      });
+      document.getElementById('main').scrollIntoView({behavior:'smooth', block:'start'});
+    }
+    document.querySelectorAll('#tabs .tab').forEach(btn=>{
+      btn.addEventListener('click', ()=>activateTab(btn.dataset.tab));
+    });
+
+    // Search filter
+    const searchInput = document.getElementById('toolSearch');
+    searchInput.addEventListener('input', e=>{
+      const q = e.target.value.trim().toLowerCase();
+      document.querySelectorAll('.tool-card').forEach(card=>{
+        const text = card.innerText.toLowerCase();
+        card.style.display = text.includes(q) ? '' : 'none';
+      });
+    });
+
+    // Service Worker (subpath-aware for GitHub Pages)
     if ('serviceWorker' in navigator) {
       const swUrl = window.__ndPath__('service-worker.js');
       const scope = window.__ndPath__('');
@@ -576,4 +579,3 @@
   </script>
 </body>
 </html>
-
